@@ -437,6 +437,118 @@ async def test_qos_comprehensive(setup_dif):
     print(f"Overall QoS compliance rate: {compliance_rate:.2f}%")
     return results
 
+@pytest.mark.asyncio
+async def test_flow_control_reliability(setup_dif):
+    """Test the reliability of flow control with packet acknowledgments"""
+    ipcp1, ipcp2, app1, app2 = setup_dif
+    flow_id = await ipcp1.allocate_flow(ipcp2, port=5000)
+    
+    # Get the flow object
+    flow = ipcp1.flows[flow_id]
+    
+    # Set a smaller window size and timeout for testing
+    flow.window_size = 4
+    flow.timeout = 0.5
+    
+    # Send multiple packets in sequence
+    total_packets = 20
+    packet_size = 512
+    
+    # Track sent sequence numbers
+    sent_seq_nums = []
+    
+    print("\n--- Testing flow control reliability ---")
+    for i in range(total_packets):
+        data = f"test-packet-{i}".encode() + b"x" * (packet_size - 15)
+        seq_num = await flow.send_data(data)
+        sent_seq_nums.append(seq_num)
+        print(f"Sent packet {i} with seq_num {seq_num}")
+        
+        # Insert small delay between sends to avoid overloading
+        if i % flow.window_size == flow.window_size - 1:
+            print(f"Window full, waiting for ACKs...")
+            await asyncio.sleep(0.1)
+    
+    # Wait for any remaining packets to be processed
+    await asyncio.sleep(1.0)
+    
+    # Check statistics
+    print(f"Statistics: Sent={flow.stats['sent_packets']}, "
+          f"Received={flow.stats['received_packets']}, "
+          f"ACKs={flow.stats['ack_packets']}, "
+          f"Retransmits={flow.stats['retransmitted_packets']}")
+    
+    # Assert all packets were acknowledged (none left in unacked_packets)
+    async with flow.window_lock:
+        assert len(flow.unacked_packets) == 0, "Some packets were not acknowledged"
+    
+    # Check that all packets were received by the other side
+    assert flow.stats['sent_packets'] >= total_packets
+    assert flow.stats['received_packets'] >= total_packets
+    assert flow.stats['ack_packets'] > 0
+    
+    return {
+        "total_packets": total_packets,
+        "sent_packets": flow.stats['sent_packets'],
+        "received_packets": flow.stats['received_packets'],
+        "ack_packets": flow.stats['ack_packets'],
+        "retransmitted_packets": flow.stats['retransmitted_packets'],
+    }
+
+@pytest.mark.asyncio
+async def test_flow_control_window_management(setup_dif):
+    """Test the window management of flow control"""
+    ipcp1, ipcp2, app1, app2 = setup_dif
+    flow_id = await ipcp1.allocate_flow(ipcp2, port=5000)
+    
+    # Get the flow object
+    flow = ipcp1.flows[flow_id]
+    
+    # Set a very small window size to test window management
+    flow.window_size = 2
+    flow.timeout = 0.5
+    
+    # Track window size over time
+    window_usage = []
+    
+    print("\n--- Testing flow control window management ---")
+    
+    # Function to check window usage
+    async def monitor_window():
+        for _ in range(20):  # Monitor for 20 samples
+            async with flow.window_lock:
+                window_usage.append(len(flow.unacked_packets))
+            await asyncio.sleep(0.1)
+    
+    # Start monitoring task
+    monitor_task = asyncio.create_task(monitor_window())
+    
+    # Flood with packets to test window management
+    for i in range(10):
+        data = f"window-test-{i}".encode() + b"x" * 100
+        try:
+            await flow.send_data(data)
+            print(f"Sent window test packet {i}")
+        except Exception as e:
+            print(f"Error sending packet {i}: {str(e)}")
+    
+    # Wait for monitoring to complete
+    await monitor_task
+    
+    print(f"Window usage over time: {window_usage}")
+    
+    # Check that window was managed correctly
+    assert max(window_usage) <= flow.window_size, "Window size exceeded"
+    
+    # Wait for packets to be processed
+    await asyncio.sleep(1.0)
+    
+    return {
+        "window_size": flow.window_size,
+        "window_usage": window_usage,
+        "max_usage": max(window_usage)
+    }
+
 # Save enhanced metrics to file
 @pytest.fixture(scope="session", autouse=True)
 def save_metrics():

@@ -1,48 +1,60 @@
+import asyncio
+
+
 class Application:
     def __init__(self, name, ipcp):
         self.name = name
         self.ipcp = ipcp
         self.port = None
         self.supports_multiple = False
+        self.receive_buffer = []
 
     async def bind(self, port):
         self.port = port
         self.ipcp.port_map[port] = self
     
     async def on_data(self, data):
-        """Echo back data for latency tests"""
+        """Handle received data with acknowledgments"""
+        # Store data in receive buffer
+        self.receive_buffer.append(data)
+        
+        # Process basic commands for testing
         if data == b"ping":
             await self.send(b"pong")
-        if data == b"data":
+        elif data == b"data":
             pass  # Just count reception
             
     async def send(self, data):
-        """Send data using first available flow"""
+        """Send data using flow control"""
         if not self.ipcp.flows:
             raise ValueError("No flows available")
+        
+        # Get the first flow for simplicity
         flow_id = next(iter(self.ipcp.flows))
         await self.ipcp.send_data(flow_id, data)
-'''
-    async def on_data(self, data):
-        print(f"{self.name} received: {data.decode()}")
-        # Count received packets
-        self.ipcp.flows[list(self.ipcp.flows.keys())[0]].stats["received_packets"] += 1
-        if data == b"ping":
-            await self.ipcp.send_data(next(iter(self.ipcp.flows)), b"pong")
-        if data == b"data":
-            pass
-
-    async def send(self, dest_app, data, qos=None, retries=3):
-        """Send data with QoS and retry on failure."""
-        for _ in range(retries):
-            flow_id = await self.ipcp.allocate_flow(dest_app.ipcp, dest_app.port, qos)
-            if flow_id is None:
-                print(f"{self.name}: Flow rejected. Retrying...")
-                await asyncio.sleep(1)  # Wait before retry
-                continue
-            
-            await self.ipcp.send_data(flow_id, data)
-            return
+    
+    async def send_reliable(self, dest_app, data, qos=None, retries=3):
+        """Send data with reliability guarantees"""
+        # Allocate a flow if needed
+        flow_id = None
+        for existing_flow_id, flow in self.ipcp.flows.items():
+            if flow.dest_ipcp == dest_app.ipcp and flow.port == dest_app.port:
+                flow_id = existing_flow_id
+                break
         
-        print(f"{self.name}: Failed to send data after {retries} retries.")
-'''
+        # If no existing flow, create one
+        if flow_id is None:
+            for _ in range(retries):
+                flow_id = await self.ipcp.allocate_flow(dest_app.ipcp, dest_app.port, qos)
+                if flow_id is not None:
+                    break
+                await asyncio.sleep(1)  # Wait before retry
+        
+        if flow_id is None:
+            raise ConnectionError(f"Failed to establish flow after {retries} attempts")
+        
+        # Send the data with flow control
+        await self.ipcp.send_data(flow_id, data)
+        
+        # The flow control system will handle acknowledgments and retransmissions
+        return True
