@@ -3,14 +3,6 @@
 import asyncio
 from enum import Enum, auto
 import time
-        
-class FlowState(Enum):
-    INITIALIZED = auto()
-    ALLOCATION_REQUESTED = auto()
-    ALLOCATED = auto()
-    ACTIVE = auto()
-    DEALLOCATING = auto()
-    CLOSED = auto()
 
 class Flow:
     def __init__(self, flow_id, src_ipcp, dest_ipcp, port, qos=None):

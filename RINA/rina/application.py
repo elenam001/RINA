@@ -1,6 +1,3 @@
-import asyncio
-
-
 class Application:
     def __init__(self, name, ipcp):
         self.name = name

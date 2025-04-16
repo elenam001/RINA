@@ -1,8 +1,6 @@
-# Fixed ipcp.py - focusing on the flow allocation process
-
 import asyncio
 import uuid
-from rina.flow import Flow, FlowAllocationFSM, FlowState
+from rina.flow import Flow, FlowAllocationFSM
 
 class IPCP:
     def __init__(self, ipcp_id, dif, lower_ipcp=None):

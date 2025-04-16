@@ -1,5 +1,3 @@
-# Fixed dif.py - focusing on bandwidth allocation
-
 class DIF:
     def __init__(self, name, layer, lower_dif=None, max_bandwidth=1000):
         self.name = name 

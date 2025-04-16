@@ -1,8 +1,8 @@
 import pytest_asyncio
 import pytest
 import asyncio
+from rina.flow import FlowAllocationFSM
 from rina.dif import DIF
-from rina.flow import FlowState
 from rina.ipcp import IPCP
 from rina.application import Application
 from rina.qos import QoS
@@ -128,7 +128,7 @@ async def test_flow_lifecycle(setup_dif):
     flow_id = await ipcp1.allocate_flow(ipcp2, port=5000, qos=qos)
     flow = ipcp1.flows[flow_id]
     
-    assert flow.state_machine.state == FlowState.ACTIVE
+    assert flow.state_machine.state == FlowAllocationFSM.State.ACTIVE
     assert ipcp1.dif.allocated_bandwidth == 50
     assert ipcp2.dif.allocated_bandwidth == 50
     
