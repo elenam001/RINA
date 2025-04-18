@@ -24,8 +24,8 @@ class Flow:
         }
         
         # Flow control parameters
-        self.window_size = 16  # Default window size
-        self.timeout = 2.0     # Default timeout in seconds
+        self.window_size = 64  # Default window size
+        self.timeout = 0.5     # Default timeout in seconds
         
         # Flow control state
         self.sequence_gen = SequenceNumber()
@@ -134,29 +134,19 @@ class Flow:
     
     async def _send_packet(self, data, seq_num=None, is_retransmission=False, already_stored=False):
         """Internal method to send a packet with sequence number"""
-        print(f"Flow {self.id}: _send_packet entered")
         if seq_num is None:
             seq_num = self.sequence_gen.next()
         
-        # Prepare packet with sequence number
         packet = {
             "seq_num": seq_num,
             "is_ack": False,
             "data": data
         }
-        print(f"Flow {self.id}: Packet prepared")
-        
-        # If not already stored and not a retransmission, store in unacked packets
         if not already_stored and not is_retransmission:
             async with self.window_lock:
                 self.unacked_packets[seq_num] = (data, time.time())
         
-        print(f"Flow {self.id}: Packet added to unacked if needed")
-        # Update stats
         self.stats['sent_packets'] += 1
-        
-        print(f"Flow {self.id}: Stats updated")
-        # Handle encapsulation and sending through IPCP
         if self.lower_flow_id and self.src_ipcp.lower_ipcp:
             encapsulated = {
                 "header": {
@@ -165,53 +155,29 @@ class Flow:
                 },
                 "payload": packet
             }
-            print(f"Flow {self.id}: Sending via lower IPCP")
             await self.src_ipcp.lower_ipcp.send_data(self.lower_flow_id, encapsulated)
-            print(f"Flow {self.id}: Sent via lower IPCP")
         else:
-            # Direct delivery
-            print(f"Flow {self.id}: Direct delivery to destination IPCP")
             await self.dest_ipcp.receive_data(packet, self.id)
-            print(f"Flow {self.id}: Direct delivery completed")
     
     async def send_data(self, data):
         """Send data with flow control"""
         if self.state_machine.state != FlowAllocationFSM.State.ACTIVE:
             raise ConnectionError("Flow not in active state")
-        
-        print(f"Flow {self.id}: Attempting to send data of size {len(data)}")
-        
         async with self.window_lock:
-            print(f"Flow {self.id}: Acquired window lock, unacked: {len(self.unacked_packets)}/{self.window_size}")
-            
-            # Wait if window is full
             while len(self.unacked_packets) >= self.window_size:
-                print(f"Flow {self.id}: Window full, waiting for ACKs...")
-                # Release lock while waiting for acks
                 self.window_lock.release()
                 lock_reacquired = False
                 try:
-                    # Wait for acknowledgments to make space in the window
                     await asyncio.wait_for(self.ack_received.wait(), timeout=self.timeout)
                     self.ack_received.clear()
                 except asyncio.TimeoutError:
                     print(f"Flow {self.id}: Timeout waiting for ACKs, retrying...")
-                    # Timeout occurred, continue anyway (will check window again)
                 finally:
-                    # Always reacquire the lock before continuing
                     await self.window_lock.acquire()
                     lock_reacquired = True
-                    print(f"Flow {self.id}: Reacquired lock after waiting, unacked: {len(self.unacked_packets)}/{self.window_size}")
-            
-            # Get sequence number and store packet in unacked while still holding the lock
             seq_num = self.sequence_gen.next()
             self.unacked_packets[seq_num] = (data, time.time())
-            print(f"Flow {self.id}: Sending packet with seq_num {seq_num}")
-        
-        # Release the lock before sending the packet
-        # Now call _send_packet without needing to acquire the lock again
         await self._send_packet(data, seq_num, already_stored=True)
-        print(f"Flow {self.id}: Sent packet {seq_num}, window now: {len(self.unacked_packets)}/{self.window_size}")
         return seq_num
     
     async def receive_data(self, packet):
@@ -233,22 +199,14 @@ class Flow:
         if ack_seq is None:
             print(f"Flow {self.id}: Received ACK with no sequence number")
             return
-        
-        print(f"Flow {self.id}: Received ACK for seq {ack_seq}")
         self.stats['ack_packets'] += 1
-        
-        # Remove acknowledged packets from unacked_packets
         async with self.window_lock:
             before_count = len(self.unacked_packets)
-            # Simply remove the exact acknowledged sequence
             if ack_seq in self.unacked_packets:
                 del self.unacked_packets[ack_seq]
             
             after_count = len(self.unacked_packets)
-            print(f"Flow {self.id}: Removed {before_count - after_count} packets from unacked")
-            
-        # Signal that space may be available in the window
-        print(f"Flow {self.id}: Setting ack_received event")
+            #print(f"Flow {self.id}: Removed {before_count - after_count} packets from unacked")
         self.ack_received.set()
     
     async def _handle_data_packet(self, packet):
@@ -259,29 +217,16 @@ class Flow:
         if seq_num is None or data is None:
             print(f"Warning: Received data packet with missing fields on flow {self.id}")
             return
-        
-        # Check if this is the expected sequence number
         if seq_num == self.recv_base:
-            # Deliver the data to the application
             await self.dest_ipcp.deliver_to_application(self.port, data)
-            
-            # Update receive base
             self.recv_base = (self.recv_base + 1) % (2**16)
-            
-            # Check if we have buffered packets that can now be delivered
             while self.recv_base in self.out_of_order_buffer:
                 buffered_data = self.out_of_order_buffer.pop(self.recv_base)
                 await self.dest_ipcp.deliver_to_application(self.port, buffered_data)
                 self.recv_base = (self.recv_base + 1) % (2**16)
         
         elif self.sequence_gen.is_in_window(seq_num, self.recv_base, self.window_size):
-            # Packet is within receive window but not the next expected one
-            # Buffer it for later delivery
             self.out_of_order_buffer[seq_num] = data
-        
-        # Otherwise, it's outside our window and we ignore it
-        
-        # Send ACK for the highest in-order packet received
         ack_packet = {
             "is_ack": True,
             "ack_seq_num": (self.recv_base - 1) % (2**16)  # ACK the last in-order packet
@@ -305,7 +250,6 @@ class Flow:
             # Direct delivery back to source
             await self.src_ipcp.receive_data(ack_packet, self.id)
 
-# Update to FlowAllocationFSM remains mostly the same
 class FlowAllocationFSM:
     class State(Enum):
         INITIALIZED = auto()

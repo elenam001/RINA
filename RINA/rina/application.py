@@ -20,7 +20,9 @@ class Application:
         
         # Process basic commands for testing
         if data == b"ping":
+            #print("qui2")
             await self.send(b"pong")
+            #print("qui3")
         elif data == b"data":
             pass  # Just count reception
             

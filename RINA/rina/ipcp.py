@@ -59,7 +59,6 @@ class IPCP:
             await flow.state_machine.handle_event("start_allocation")
             await flow._commit_resources()
             
-            print(f"Flow {flow_id} successfully allocated")
             return flow_id
             
         except Exception as e:
@@ -77,7 +76,6 @@ class IPCP:
             if flow_id in flow.dest_ipcp.flows:
                 del flow.dest_ipcp.flows[flow_id]
                 
-            print(f"Flow {flow_id} successfully deallocated")
             return True
         return False
     
@@ -126,8 +124,6 @@ class IPCP:
             
     async def receive_data(self, data, flow_id):
         """Handle incoming data."""
-        print(f"IPCP {self.id}: Received data for flow {flow_id}")
-        
         if flow_id in self.flows:
             flow = self.flows[flow_id]
             
@@ -150,7 +146,6 @@ class IPCP:
     
     async def deliver_to_application(self, port, data):
         """Deliver data to the application at the specified port."""
-        print(f"IPCP {self.id}: Delivering data to port {port}")
         if port in self.port_map:
             flow = None
             for f in self.flows.values():
@@ -160,7 +155,6 @@ class IPCP:
                 break
                 
             try:
-                await asyncio.wait_for(self.port_map[port].on_data(data), timeout=0.5)
-                print(f"IPCP {self.id}: Delivered data to port {port}")
+                await asyncio.wait_for(self.port_map[port].on_data(data), timeout=0.1)
             except asyncio.TimeoutError:
                 print(f"IPCP {self.id}: Timeout delivering to application on port {port}")
