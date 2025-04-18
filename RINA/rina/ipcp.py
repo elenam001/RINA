@@ -70,16 +70,7 @@ class IPCP:
         """Deallocate a flow and release its resources."""
         if flow_id in self.flows:
             flow = self.flows[flow_id]
-            
-            # Release bandwidth resources
-            if flow.qos and flow.qos.bandwidth:
-                self.dif.release_bandwidth(flow.qos.bandwidth)
-                if flow.dest_ipcp.dif != self.dif:
-                    flow.dest_ipcp.dif.release_bandwidth(flow.qos.bandwidth)
-            
-            # Release lower flow if applicable
-            if flow.lower_flow_id and self.lower_ipcp:
-                await self.lower_ipcp.deallocate_flow(flow.lower_flow_id)
+            await flow.state_machine.handle_event("deallocate")
             
             # Remove flow from both IPCPs
             del self.flows[flow_id]
@@ -121,7 +112,7 @@ class IPCP:
             return False
             
     async def send_data(self, flow_id, data):
-        """Send data through an allocated flow."""
+        """Send data through an allocated flow with flow control."""
         if flow_id not in self.flows:
             raise ValueError(f"Flow {flow_id} not found")
 
@@ -130,35 +121,42 @@ class IPCP:
         if flow.state_machine.state != FlowAllocationFSM.State.ACTIVE:
             raise ConnectionError("Flow not in active state")
 
-        # Update flow statistics
-        flow.stats['sent_packets'] += 1
-        
-        # Handle encapsulation for lower layers
-        if flow.lower_flow_id and self.lower_ipcp:
-            encapsulated = {
-                "header": {
-                    "flow_id": flow_id,
-                    "qos": flow.qos.to_dict() if flow.qos else None
-                },
-                "payload": data
-            }
-            await self.lower_ipcp.send_data(flow.lower_flow_id, encapsulated)
-        else:
-            # Direct delivery to destination IPCP
-            await flow.dest_ipcp.receive_data(data, flow_id)
+        # Let the flow handle the sending with flow control
+        await flow.send_data(data)
             
     async def receive_data(self, data, flow_id):
         """Handle incoming data."""
-        if isinstance(data, dict) and 'header' in data:
-            # Decapsulate lower layer data
-            if self.higher_ipcp:
-                await self.higher_ipcp.receive_data(
-                    data['payload'], 
-                    data['header']['flow_id']
-                )
-        else:
-            if flow_id in self.flows:
-                flow = self.flows[flow_id]
-                flow.stats['received_packets'] += 1
-                if flow.port in self.port_map:
-                    await self.port_map[flow.port].on_data(data)
+        if flow_id in self.flows:
+            flow = self.flows[flow_id]
+            
+            # Check if it's encapsulated data from lower layer
+            if isinstance(data, dict) and 'header' in data:
+                # Decapsulate lower layer data
+                if self.higher_ipcp:
+                    await self.higher_ipcp.receive_data(
+                        data['payload'], 
+                        data['header']['flow_id']
+                    )
+                    return
+                # Extract payload for this layer
+                data = data['payload']
+            
+            # Pass to flow for handling (acknowledgments, etc.)
+            await flow.receive_data(data)
+    
+    async def deliver_to_application(self, port, data):
+        """Deliver data to the application at the specified port."""
+        print(f"IPCP {self.id}: Delivering data to port {port}")
+        if port in self.port_map:
+            flow = None
+            for f in self.flows.values():
+                # Update statistics for whichever flow this is for
+                f.stats['received_packets'] += 1
+                flow = f
+                break
+                
+            try:
+                await asyncio.wait_for(self.port_map[port].on_data(data), timeout=0.5)
+                print(f"IPCP {self.id}: Delivered data to port {port}")
+            except asyncio.TimeoutError:
+                print(f"IPCP {self.id}: Timeout delivering to application on port {port}")
