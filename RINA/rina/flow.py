@@ -189,6 +189,7 @@ class Flow:
                 print(f"Flow {self.id}: Window full, waiting for ACKs...")
                 # Release lock while waiting for acks
                 self.window_lock.release()
+                lock_reacquired = False
                 try:
                     # Wait for acknowledgments to make space in the window
                     await asyncio.wait_for(self.ack_received.wait(), timeout=self.timeout)
@@ -196,9 +197,11 @@ class Flow:
                 except asyncio.TimeoutError:
                     print(f"Flow {self.id}: Timeout waiting for ACKs, retrying...")
                     # Timeout occurred, continue anyway (will check window again)
-                # Reacquire lock
-                await self.window_lock.acquire()
-                print(f"Flow {self.id}: Reacquired lock after waiting, unacked: {len(self.unacked_packets)}/{self.window_size}")
+                finally:
+                    # Always reacquire the lock before continuing
+                    await self.window_lock.acquire()
+                    lock_reacquired = True
+                    print(f"Flow {self.id}: Reacquired lock after waiting, unacked: {len(self.unacked_packets)}/{self.window_size}")
             
             # Get sequence number and store packet in unacked while still holding the lock
             seq_num = self.sequence_gen.next()
