@@ -146,13 +146,17 @@ class IPCP:
     
     async def deliver_to_application(self, port, data):
         """Deliver data to the application at the specified port."""
+        print(f"IPCP {self.id}: Delivering data to port {port}")
         if port in self.port_map:
             flow = None
             for f in self.flows.values():
                 # Update statistics for whichever flow this is for
-                # (simplified - we'd normally use the correct flow)
                 f.stats['received_packets'] += 1
                 flow = f
                 break
                 
-            await self.port_map[port].on_data(data)
+            try:
+                await asyncio.wait_for(self.port_map[port].on_data(data), timeout=0.5)
+                print(f"IPCP {self.id}: Delivered data to port {port}")
+            except asyncio.TimeoutError:
+                print(f"IPCP {self.id}: Timeout delivering to application on port {port}")

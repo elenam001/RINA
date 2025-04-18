@@ -171,9 +171,14 @@ class Flow:
         if self.state_machine.state != FlowAllocationFSM.State.ACTIVE:
             raise ConnectionError("Flow not in active state")
         
+        print(f"Flow {self.id}: Attempting to send data of size {len(data)}")
+        
         async with self.window_lock:
+            print(f"Flow {self.id}: Acquired window lock, unacked: {len(self.unacked_packets)}/{self.window_size}")
+            
             # Wait if window is full
             while len(self.unacked_packets) >= self.window_size:
+                print(f"Flow {self.id}: Window full, waiting for ACKs...")
                 # Release lock while waiting for acks
                 self.window_lock.release()
                 try:
@@ -181,14 +186,17 @@ class Flow:
                     await asyncio.wait_for(self.ack_received.wait(), timeout=self.timeout)
                     self.ack_received.clear()
                 except asyncio.TimeoutError:
+                    print(f"Flow {self.id}: Timeout waiting for ACKs, retrying...")
                     # Timeout occurred, continue anyway (will check window again)
-                    pass
                 # Reacquire lock
                 await self.window_lock.acquire()
+                print(f"Flow {self.id}: Reacquired lock after waiting, unacked: {len(self.unacked_packets)}/{self.window_size}")
             
             # Send the packet
             seq_num = self.sequence_gen.next()
+            print(f"Flow {self.id}: Sending packet with seq_num {seq_num}")
             await self._send_packet(data, seq_num)
+            print(f"Flow {self.id}: Sent packet {seq_num}, window now: {len(self.unacked_packets)}/{self.window_size}")
             return seq_num
     
     async def receive_data(self, packet):
@@ -208,12 +216,15 @@ class Flow:
         """Process an acknowledgment packet"""
         ack_seq = ack_packet.get("ack_seq_num")
         if ack_seq is None:
+            print(f"Flow {self.id}: Received ACK with no sequence number")
             return
         
+        print(f"Flow {self.id}: Received ACK for seq {ack_seq}")
         self.stats['ack_packets'] += 1
         
         # Remove acknowledged packets from unacked_packets
         async with self.window_lock:
+            before_count = len(self.unacked_packets)
             # Find all sequence numbers that are less than or equal to the ACK sequence number
             to_remove = [seq for seq in self.unacked_packets.keys() 
                         if (ack_seq >= seq) or (ack_seq < seq and ack_seq < self.send_base)]
@@ -221,6 +232,9 @@ class Flow:
             # Remove all acknowledged packets
             for seq in to_remove:
                 del self.unacked_packets[seq]
+            
+            after_count = len(self.unacked_packets)
+            print(f"Flow {self.id}: Removed {before_count - after_count} packets from unacked")
             
             # Update send_base if necessary
             if not self.unacked_packets:
@@ -231,6 +245,7 @@ class Flow:
                 self.send_base = min(self.unacked_packets.keys())
         
         # Signal that space may be available in the window
+        print(f"Flow {self.id}: Setting ack_received event")
         self.ack_received.set()
     
     async def _handle_data_packet(self, packet):
