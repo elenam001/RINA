@@ -84,9 +84,8 @@ async def test_throughput_by_size(setup_dif):
     ipcp1, ipcp2, _, _ = setup_dif
     flow_id = await ipcp1.allocate_flow(ipcp2, port=5000)
     
-    # Get flow and modify parameters for testing
     flow = ipcp1.flows[flow_id]
-    flow.timeout = 0.5  # Shorter timeout for testing
+    flow.timeout = 0.5
     
     packet_sizes = [64, 256, 1024]  # Smaller sizes first
     chunks_per_size = 50  # Start with fewer chunks
@@ -103,7 +102,6 @@ async def test_throughput_by_size(setup_dif):
                 print(f"Sending chunk {i+1}/{chunks_per_size} of size {size}")
                 await asyncio.wait_for(ipcp1.send_data(flow_id, data), timeout=2.0)
                 success_count += 1
-                # Small sleep to prevent overwhelming the system
                 if i % 10 == 0:
                     await asyncio.sleep(0.01)
             except asyncio.TimeoutError:

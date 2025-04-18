@@ -132,8 +132,9 @@ class Flow:
             # Task was cancelled, clean up and exit
             pass
     
-    async def _send_packet(self, data, seq_num=None, is_retransmission=False):
+    async def _send_packet(self, data, seq_num=None, is_retransmission=False, already_stored=False):
         """Internal method to send a packet with sequence number"""
+        print(f"Flow {self.id}: _send_packet entered")
         if seq_num is None:
             seq_num = self.sequence_gen.next()
         
@@ -143,15 +144,18 @@ class Flow:
             "is_ack": False,
             "data": data
         }
+        print(f"Flow {self.id}: Packet prepared")
         
-        # If not a retransmission, store in unacked packets
-        if not is_retransmission:
+        # If not already stored and not a retransmission, store in unacked packets
+        if not already_stored and not is_retransmission:
             async with self.window_lock:
                 self.unacked_packets[seq_num] = (data, time.time())
         
+        print(f"Flow {self.id}: Packet added to unacked if needed")
         # Update stats
         self.stats['sent_packets'] += 1
         
+        print(f"Flow {self.id}: Stats updated")
         # Handle encapsulation and sending through IPCP
         if self.lower_flow_id and self.src_ipcp.lower_ipcp:
             encapsulated = {
@@ -161,10 +165,14 @@ class Flow:
                 },
                 "payload": packet
             }
+            print(f"Flow {self.id}: Sending via lower IPCP")
             await self.src_ipcp.lower_ipcp.send_data(self.lower_flow_id, encapsulated)
+            print(f"Flow {self.id}: Sent via lower IPCP")
         else:
             # Direct delivery
+            print(f"Flow {self.id}: Direct delivery to destination IPCP")
             await self.dest_ipcp.receive_data(packet, self.id)
+            print(f"Flow {self.id}: Direct delivery completed")
     
     async def send_data(self, data):
         """Send data with flow control"""
@@ -192,12 +200,16 @@ class Flow:
                 await self.window_lock.acquire()
                 print(f"Flow {self.id}: Reacquired lock after waiting, unacked: {len(self.unacked_packets)}/{self.window_size}")
             
-            # Send the packet
+            # Get sequence number and store packet in unacked while still holding the lock
             seq_num = self.sequence_gen.next()
+            self.unacked_packets[seq_num] = (data, time.time())
             print(f"Flow {self.id}: Sending packet with seq_num {seq_num}")
-            await self._send_packet(data, seq_num)
-            print(f"Flow {self.id}: Sent packet {seq_num}, window now: {len(self.unacked_packets)}/{self.window_size}")
-            return seq_num
+        
+        # Release the lock before sending the packet
+        # Now call _send_packet without needing to acquire the lock again
+        await self._send_packet(data, seq_num, already_stored=True)
+        print(f"Flow {self.id}: Sent packet {seq_num}, window now: {len(self.unacked_packets)}/{self.window_size}")
+        return seq_num
     
     async def receive_data(self, packet):
         """Process received data or acknowledgment packets"""
@@ -225,25 +237,13 @@ class Flow:
         # Remove acknowledged packets from unacked_packets
         async with self.window_lock:
             before_count = len(self.unacked_packets)
-            # Find all sequence numbers that are less than or equal to the ACK sequence number
-            to_remove = [seq for seq in self.unacked_packets.keys() 
-                        if (ack_seq >= seq) or (ack_seq < seq and ack_seq < self.send_base)]
-            
-            # Remove all acknowledged packets
-            for seq in to_remove:
-                del self.unacked_packets[seq]
+            # Simply remove the exact acknowledged sequence
+            if ack_seq in self.unacked_packets:
+                del self.unacked_packets[ack_seq]
             
             after_count = len(self.unacked_packets)
             print(f"Flow {self.id}: Removed {before_count - after_count} packets from unacked")
             
-            # Update send_base if necessary
-            if not self.unacked_packets:
-                # If all packets are acknowledged, update send_base to next_seq_num
-                self.send_base = self.next_seq_num
-            else:
-                # Otherwise, update to the smallest unacknowledged sequence number
-                self.send_base = min(self.unacked_packets.keys())
-        
         # Signal that space may be available in the window
         print(f"Flow {self.id}: Setting ack_received event")
         self.ack_received.set()

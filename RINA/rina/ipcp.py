@@ -126,6 +126,8 @@ class IPCP:
             
     async def receive_data(self, data, flow_id):
         """Handle incoming data."""
+        print(f"IPCP {self.id}: Received data for flow {flow_id}")
+        
         if flow_id in self.flows:
             flow = self.flows[flow_id]
             
@@ -143,6 +145,8 @@ class IPCP:
             
             # Pass to flow for handling (acknowledgments, etc.)
             await flow.receive_data(data)
+        else:
+            print(f"IPCP {self.id}: No flow found for ID {flow_id}")
     
     async def deliver_to_application(self, port, data):
         """Deliver data to the application at the specified port."""
