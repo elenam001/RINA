@@ -1,3 +1,6 @@
+import logging
+
+
 class DIF:
     def __init__(self, name, layer, lower_dif=None, max_bandwidth=1000):
         self.name = name 
@@ -36,10 +39,10 @@ class DIF:
             
         if self.allocated_bandwidth + bandwidth <= self.max_bandwidth:
             self.allocated_bandwidth += bandwidth
-            print(f"DIF {self.name}: Allocated {bandwidth} bandwidth, total now: {self.allocated_bandwidth}/{self.max_bandwidth}")
+            logging.debug(f"DIF {self.name}: Allocated {bandwidth} bandwidth, total now: {self.allocated_bandwidth}/{self.max_bandwidth}")
             return True
         else:
-            print(f"DIF {self.name}: Cannot allocate {bandwidth} bandwidth, available: {self.max_bandwidth - self.allocated_bandwidth}")
+            logging.debug(f"DIF {self.name}: Cannot allocate {bandwidth} bandwidth, available: {self.max_bandwidth - self.allocated_bandwidth}")
             return False
 
     def release_bandwidth(self, bandwidth):
@@ -48,7 +51,7 @@ class DIF:
             return
             
         self.allocated_bandwidth = max(0, self.allocated_bandwidth - bandwidth)
-        print(f"DIF {self.name}: Released {bandwidth} bandwidth, total now: {self.allocated_bandwidth}/{self.max_bandwidth}")
+        logging.debug(f"DIF {self.name}: Released {bandwidth} bandwidth, total now: {self.allocated_bandwidth}/{self.max_bandwidth}")
 
     def list_allocated_flows(self):
         return [flow.id for flow in self.allocated_flows.values()]

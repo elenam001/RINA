@@ -1,4 +1,5 @@
 import asyncio
+import logging
 import uuid
 from rina.flow import Flow, FlowAllocationFSM
 
@@ -157,4 +158,4 @@ class IPCP:
             try:
                 await asyncio.wait_for(self.port_map[port].on_data(data), timeout=0.1)
             except asyncio.TimeoutError:
-                print(f"IPCP {self.id}: Timeout delivering to application on port {port}")
+                logging.debug(f"IPCP {self.id}: Timeout delivering to application on port {port}")

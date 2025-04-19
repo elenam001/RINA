@@ -122,7 +122,7 @@ class Flow:
                 
                 # Retransmit any timed-out packets
                 for seq_num, data in retransmit_packets:
-                    print(f"Retransmitting packet {seq_num} for flow {self.id}")
+                    #print(f"Retransmitting packet {seq_num} for flow {self.id}")
                     await self._send_packet(data, seq_num, is_retransmission=True)
                     self.stats["retransmitted_packets"] += 1
                 
@@ -233,9 +233,9 @@ class Flow:
         }
         
         # Send the ACK packet back
-        await self._send_ack(ack_packet)
+        await self.send_ack(ack_packet)
     
-    async def _send_ack(self, ack_packet):
+    async def send_ack(self, ack_packet):
         """Send an acknowledgment packet"""
         if self.lower_flow_id and self.src_ipcp.lower_ipcp:
             encapsulated = {
