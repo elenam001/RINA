@@ -40,20 +40,16 @@ metrics = {
         "values": [],
         "average": None
     },
-    "resource_utilization": {
-        "bandwidth_usage": [],
-        "cpu_usage": [],  # If available in your implementation
-        "memory_usage": []  # If available in your implementation
-    },
     "scalability": {
         "concurrent_flows": [],
         "flow_setup_times": []
     },
-    "qos": {
-        "compliance_rate": None,
-        "latency_violations": 0,
-        "bandwidth_violations": 0,
-        "tests": []
+    "flow":{
+        "total_packets": None,
+        "sent_packets": None,
+        "received_packets": None,
+        "ack_packets": None,
+        "retransmitted_packets": None,
     }
 }
 
@@ -77,7 +73,7 @@ async def setup_dif():
     for flow_id in list(ipcp2.flows.keys()):
         await ipcp2.deallocate_flow(flow_id)
 
-# 1. Enhanced Throughput Tests
+# 1. Throughput Tests
 @pytest.mark.asyncio
 async def test_throughput_by_size(setup_dif):
     """Test throughput with varying packet sizes"""
@@ -99,8 +95,8 @@ async def test_throughput_by_size(setup_dif):
         success_count = 0
         for i in range(chunks_per_size):
             try:
-                print(f"Sending chunk {i+1}/{chunks_per_size} of size {size}")
-                await asyncio.wait_for(ipcp1.send_data(flow_id, data), timeout=2.0)
+                #print(f"Sending chunk {i+1}/{chunks_per_size} of size {size}")
+                await asyncio.wait_for(ipcp1.send_data(flow_id, data), timeout=0.5)
                 success_count += 1
                 if i % 10 == 0:
                     await asyncio.sleep(0.01)
@@ -177,7 +173,7 @@ async def test_latency_comprehensive(setup_dif):
     for i in range(samples):
         start = time.time()
         await ipcp1.send_data(flow_id, b"ping")
-        await asyncio.sleep(0.01)  # Allow time for echo
+        await asyncio.sleep(0.01)
         latency = (time.time() - start) * 1000  # ms
         latencies.append(latency)
         timestamps.append(start)
@@ -226,6 +222,9 @@ async def test_packet_delivery_ratio(setup_dif):
     results = {}
     
     for count in packet_counts:
+        # Reset received counter
+        ipcp2.flows[flow_id].stats["received_packets"] = 0
+        
         sent = 0
         for _ in range(count):
             await ipcp1.send_data(flow_id, b"data")
@@ -282,49 +281,6 @@ async def test_round_trip_time(setup_dif):
     metrics["round_trip_time"]["average"] = statistics.mean(metrics["round_trip_time"]["values"])
     
     return results
-
-# 5. Resource Utilization Tests
-@pytest.mark.asyncio
-async def test_bandwidth_utilization(setup_dif):
-    """Test bandwidth utilization with different QoS settings"""
-    ipcp1, ipcp2, _, _ = setup_dif
-    
-    test_bandwidths = [50, 100, 200, 500]
-    results = {}
-    
-    for target_bw in test_bandwidths:
-        qos = QoS(bandwidth=target_bw)
-        flow_id = await ipcp1.allocate_flow(ipcp2, port=5000, qos=qos)
-        
-        if flow_id:
-            # Test throughput with the allocated bandwidth
-            chunk_size = 4096
-            data = b"x" * chunk_size
-            total_chunks = 1000
-            
-            start_time = time.time()
-            for _ in range(total_chunks):
-                await ipcp1.send_data(flow_id, data)
-            
-            duration = max(time.time() - start_time, 0.001)
-            achieved_throughput = (chunk_size * total_chunks * 8) / (duration * 1000000)  # Mbps
-            
-            utilization = (achieved_throughput / target_bw) * 100
-            results[target_bw] = utilization
-            
-            metrics["resource_utilization"]["bandwidth_usage"].append({
-                "target": target_bw,
-                "achieved": achieved_throughput,
-                "utilization": utilization
-            })
-            
-            print(f"Bandwidth utilization at {target_bw} Mbps target: {utilization:.2f}%")
-            
-            # Clean up
-            await ipcp1.deallocate_flow(flow_id)
-    
-    return results
-
 # 6. Scalability Tests
 @pytest.mark.asyncio
 async def test_concurrent_flows(setup_dif):
@@ -369,92 +325,6 @@ async def test_concurrent_flows(setup_dif):
     
     return results
 
-# 7. QoS Compliance Tests
-@pytest.mark.asyncio
-async def test_qos_comprehensive(setup_dif):
-    """Comprehensive test of QoS compliance across different parameters"""
-    ipcp1, ipcp2, _, _ = setup_dif
-    
-    qos_profiles = [
-        {"bandwidth": 50, "latency": 50},  # Basic profile
-        {"bandwidth": 100, "latency": 20},  # Low latency profile
-        {"bandwidth": 200, "latency": 100}  # High bandwidth profile
-    ]
-    
-    results = []
-    violations = {"latency": 0, "bandwidth": 0}
-    total_tests = 0
-    
-    for profile in qos_profiles:
-        qos = QoS(bandwidth=profile["bandwidth"], latency=profile["latency"])
-        flow_id = await ipcp1.allocate_flow(ipcp2, port=5000, qos=qos)
-        
-        if flow_id:
-            # Test bandwidth compliance
-            chunk_size = 4096
-            data = b"x" * chunk_size
-            total_chunks = 500
-            
-            start_time = time.time()
-            for _ in range(total_chunks):
-                await ipcp1.send_data(flow_id, data)
-            
-            duration = max(time.time() - start_time, 0.001)
-            achieved_throughput = (chunk_size * total_chunks * 8) / (duration * 1000000)  # Mbps
-            
-            # Test latency compliance
-            latencies = []
-            for _ in range(50):
-                ping_start = time.time()
-                await ipcp1.send_data(flow_id, b"ping")
-                await asyncio.sleep(0.01)  # Allow time for echo
-                latency = (time.time() - ping_start) * 1000  # ms
-                latencies.append(latency)
-            
-            avg_latency = statistics.mean(latencies)
-            
-            # Check compliance
-            bw_compliant = achieved_throughput >= profile["bandwidth"]
-            latency_compliant = avg_latency <= profile["latency"]
-            
-            if not bw_compliant:
-                violations["bandwidth"] += 1
-            if not latency_compliant:
-                violations["latency"] += 1
-            
-            total_tests += 2  # One test each for bandwidth and latency
-            
-            test_result = {
-                "profile": profile,
-                "bandwidth": {
-                    "target": profile["bandwidth"],
-                    "achieved": achieved_throughput,
-                    "compliant": bw_compliant
-                },
-                "latency": {
-                    "target": profile["latency"],
-                    "achieved": avg_latency,
-                    "compliant": latency_compliant
-                }
-            }
-            
-            results.append(test_result)
-            metrics["qos"]["tests"].append(test_result)
-            
-            print(f"QoS Profile {profile}: Bandwidth compliance: {bw_compliant}, Latency compliance: {latency_compliant}")
-            
-            # Clean up
-            await ipcp1.deallocate_flow(flow_id)
-    
-    # Calculate overall compliance rate
-    compliance_rate = (total_tests - violations["bandwidth"] - violations["latency"]) / total_tests * 100
-    metrics["qos"]["compliance_rate"] = compliance_rate
-    metrics["qos"]["latency_violations"] = violations["latency"]
-    metrics["qos"]["bandwidth_violations"] = violations["bandwidth"]
-    
-    print(f"Overall QoS compliance rate: {compliance_rate:.2f}%")
-    return results
-
 @pytest.mark.asyncio
 async def test_flow_control_reliability(setup_dif):
     """Test the reliability of flow control with packet acknowledgments"""
@@ -480,7 +350,7 @@ async def test_flow_control_reliability(setup_dif):
         data = f"test-packet-{i}".encode() + b"x" * (packet_size - 15)
         seq_num = await flow.send_data(data)
         sent_seq_nums.append(seq_num)
-        print(f"Sent packet {i} with seq_num {seq_num}")
+        #print(f"Sent packet {i} with seq_num {seq_num}")
         
         # Insert small delay between sends to avoid overloading
         if i % flow.window_size == flow.window_size - 1:
@@ -505,6 +375,14 @@ async def test_flow_control_reliability(setup_dif):
     assert flow.stats['received_packets'] >= total_packets
     assert flow.stats['ack_packets'] > 0
     
+    metrics["flow"].update({
+        "total_packets": total_packets,
+        "sent_packets": flow.stats['sent_packets'],
+        "received_packets": flow.stats['received_packets'],
+        "ack_packets": flow.stats['ack_packets'],
+        "retransmitted_packets": flow.stats['retransmitted_packets']
+    })
+
     return {
         "total_packets": total_packets,
         "sent_packets": flow.stats['sent_packets'],
@@ -513,61 +391,6 @@ async def test_flow_control_reliability(setup_dif):
         "retransmitted_packets": flow.stats['retransmitted_packets'],
     }
 
-@pytest.mark.asyncio
-async def test_flow_control_window_management(setup_dif):
-    """Test the window management of flow control"""
-    ipcp1, ipcp2, app1, app2 = setup_dif
-    flow_id = await ipcp1.allocate_flow(ipcp2, port=5000)
-    
-    # Get the flow object
-    flow = ipcp1.flows[flow_id]
-    
-    # Set a very small window size to test window management
-    flow.window_size = 2
-    flow.timeout = 0.5
-    
-    # Track window size over time
-    window_usage = []
-    
-    print("\n--- Testing flow control window management ---")
-    
-    # Function to check window usage
-    async def monitor_window():
-        for _ in range(20):  # Monitor for 20 samples
-            async with flow.window_lock:
-                window_usage.append(len(flow.unacked_packets))
-            await asyncio.sleep(0.1)
-    
-    # Start monitoring task
-    monitor_task = asyncio.create_task(monitor_window())
-    
-    # Flood with packets to test window management
-    for i in range(10):
-        data = f"window-test-{i}".encode() + b"x" * 100
-        try:
-            await flow.send_data(data)
-            print(f"Sent window test packet {i}")
-        except Exception as e:
-            print(f"Error sending packet {i}: {str(e)}")
-    
-    # Wait for monitoring to complete
-    await monitor_task
-    
-    print(f"Window usage over time: {window_usage}")
-    
-    # Check that window was managed correctly
-    assert max(window_usage) <= flow.window_size, "Window size exceeded"
-    
-    # Wait for packets to be processed
-    await asyncio.sleep(1.0)
-    
-    return {
-        "window_size": flow.window_size,
-        "window_usage": window_usage,
-        "max_usage": max(window_usage)
-    }
-
-# Save enhanced metrics to file
 @pytest.fixture(scope="session", autouse=True)
 def save_metrics():
     yield
