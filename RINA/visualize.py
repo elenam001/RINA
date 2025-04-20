@@ -8,26 +8,17 @@ from pathlib import Path
 from matplotlib.colors import LinearSegmentedColormap
 
 def main():
-    # Set the style for better aesthetics
     plt.style.use('ggplot')
     sns.set_context("talk")
-    
-    # Load metrics from JSON file
     with open("metrics.json", "r") as f:
         metrics = json.load(f)
-    
-    # Export metrics to CSV
     export_to_csv(metrics)
-    
-    # Create a figure with adjusted grid layout
     fig = plt.figure(figsize=(20, 18))
     gs = gridspec.GridSpec(3, 3, figure=fig)
-    
-    # Define custom color palettes
     main_colors = ["#3498db", "#2ecc71", "#e74c3c", "#f39c12", "#9b59b6"]
     cmap_blue = LinearSegmentedColormap.from_list("", ["#d4e6f1", "#3498db", "#1a5276"])
     
-    # 1. Latency Distribution - Upper Left
+    # 1. Latency Distribution
     ax1 = fig.add_subplot(gs[0, 0])
     if metrics["latency"]["values"]:
         sns.histplot(metrics["latency"]["values"], bins=20, kde=True, color=main_colors[0], ax=ax1)
@@ -43,7 +34,7 @@ def main():
         ax1.text(0.5, 0.5, 'No Latency Data', ha='center', va='center')
         ax1.set_title("Latency Distribution", fontweight='bold', fontsize=14)
     
-    # 2. Throughput by Packet Size - Upper Middle
+    # 2. Throughput by Packet Size
     ax2 = fig.add_subplot(gs[0, 1])
     if metrics["throughput"]["by_size"]:
         sizes = sorted([int(s) for s in metrics["throughput"]["by_size"].keys()])
@@ -67,7 +58,7 @@ def main():
         ax2.text(0.5, 0.5, 'No Throughput Data', ha='center', va='center')
         ax2.set_title("Throughput by Packet Size", fontweight='bold', fontsize=14)
     
-    # 3. Performance Metrics Dashboard - Upper Right
+    # 3. Performance Metrics Dashboard
     ax3 = fig.add_subplot(gs[0, 2])
     metric_names = ["Avg. Latency", "Avg. Jitter", "Avg. Throughput", "Packet Delivery", "Avg. RTT"]
     metric_values = [
@@ -91,7 +82,7 @@ def main():
                 va='center', color=text_color)
     ax3.set_title("Performance Summary", fontweight='bold', fontsize=14)
     
-    # 4. Jitter vs. Latency Scatter - Middle Left
+    # 4. Jitter vs. Latency Scatter
     ax4 = fig.add_subplot(gs[1, 0])
     jitter_values = metrics["jitter"]["values"]
     latency_values = metrics["latency"]["values"][:len(jitter_values)]
@@ -106,7 +97,7 @@ def main():
         ax4.text(0.5, 0.5, 'No Jitter/Latency Data', ha='center', va='center')
         ax4.set_title("Jitter vs. Latency", fontweight='bold', fontsize=14)
     
-    # 5. Packet Delivery - Middle Center
+    # 5. Packet Delivery
     ax5 = fig.add_subplot(gs[1, 1])
     total_sent = metrics["packet_delivery_ratio"]["total_sent"]
     delivered = metrics["packet_delivery_ratio"]["total_received"]
@@ -124,13 +115,12 @@ def main():
         ax5.text(0.5, 0.5, 'No Packet Data', ha='center', va='center')
     ax5.set_title("Packet Delivery", fontweight='bold', fontsize=14)
     
-    # 6. Flow Management - Middle Right
+    # 6. Flow Management
     ax6 = fig.add_subplot(gs[1, 2])
     flow_counts = metrics["scalability"]["concurrent_flows"]
     setup_times = metrics["scalability"]["flow_setup_times"]
     
     if flow_counts and setup_times:
-        # Sort data by flow count
         sorted_data = sorted(zip(flow_counts, setup_times), key=lambda x: x[0])
         flow_counts, setup_times = zip(*sorted_data) if sorted_data else ([], [])
         
@@ -147,7 +137,7 @@ def main():
         ax6.text(0.5, 0.5, 'No Flow Data', ha='center', va='center')
         ax6.set_title("Flow Setup Performance", fontweight='bold', fontsize=14)
     
-    # 7. Flow Control Metrics - Bottom Left
+    # 7. Flow Control Metrics
     ax7 = fig.add_subplot(gs[2, 0])
     flow_metrics = [
         ("Sent", metrics["flow"]["sent_packets"]),
@@ -174,65 +164,6 @@ def main():
     else:
         ax7.text(0.5, 0.5, 'No Flow Control Data', ha='center', va='center')
         ax7.set_title("Flow Control Performance", fontweight='bold', fontsize=14)
-    
-    # 8. Error Recovery - Bottom Middle
-    ax8 = fig.add_subplot(gs[2, 1])
-    recovery_times = metrics["error_recovery"]["recovery_time"]
-    success_rate = metrics["error_recovery"]["success_rate"]
-    
-    if recovery_times:
-        sns.histplot(recovery_times, bins=10, kde=True, color=main_colors[3], ax=ax8)
-        ax8.set_xlabel("Recovery Time (s)")
-        ax8.set_ylabel("Frequency")
-        if "avg_recovery_time" in metrics["error_recovery"]:
-            avg_recovery = metrics["error_recovery"]["avg_recovery_time"]
-            ax8.axvline(avg_recovery, color='red', linestyle='dashed', linewidth=2, 
-                       label=f'Mean: {avg_recovery:.3f}s')
-            ax8.legend()
-        if success_rate is not None:
-            ax8.set_title(f"Error Recovery (Success Rate: {success_rate:.1f}%)", fontweight='bold', fontsize=14)
-        else:
-            ax8.set_title("Error Recovery", fontweight='bold', fontsize=14)
-    else:
-        ax8.text(0.5, 0.5, 'No Error Recovery Data', ha='center', va='center')
-        ax8.set_title("Error Recovery", fontweight='bold', fontsize=14)
-    
-    # 9. QoS Metrics or PDR by Network Load - Bottom Right
-    ax9 = fig.add_subplot(gs[2, 2])
-    
-    if metrics["packet_delivery_ratio"]["by_network_load"]:
-        loads = sorted([int(l) for l in metrics["packet_delivery_ratio"]["by_network_load"].keys()])
-        ratios = [metrics["packet_delivery_ratio"]["by_network_load"][str(l)] for l in loads]
-        
-        ax9.plot(loads, ratios, 'o-', color=main_colors[4], linewidth=2, markersize=10)
-        ax9.set_xlabel("Network Load (Concurrent Flows)")
-        ax9.set_ylabel("Packet Delivery Ratio (%)")
-        ax9.set_ylim(0, 105)  # Leave room for annotations
-        
-        for load, ratio in zip(loads, ratios):
-            ax9.annotate(f"{ratio:.1f}%", 
-                        xy=(load, ratio), 
-                        xytext=(0, 5), 
-                        textcoords='offset points',
-                        ha='center')
-        
-        ax9.set_title("Packet Delivery Under Load", fontweight='bold', fontsize=14)
-    elif metrics["throughput"].get("with_congestion", {}).get("per_flow"):
-        # Alternative: show throughput under congestion if available
-        throughputs = metrics["throughput"]["with_congestion"]["per_flow"]
-        flow_indices = list(range(1, len(throughputs) + 1))
-        
-        ax9.bar(flow_indices, throughputs, color=main_colors[1])
-        ax9.axhline(metrics["throughput"]["with_congestion"]["total"] / len(throughputs), 
-                   color=main_colors[0], linestyle='dashed', linewidth=2, 
-                   label=f'Average: {metrics["throughput"]["with_congestion"]["total"] / len(throughputs):.2f} Mbps')
-        ax9.set_xlabel("Flow Number")
-        ax9.set_ylabel("Throughput (Mbps)")
-        ax9.set_title("Throughput Under Congestion", fontweight='bold', fontsize=14)
-        ax9.legend()
-    else:
-        ax9.text(0.5, 0.5, 'No QoS/Load Data', ha='center', va='center')
-        ax9.set_title("QoS Metrics", fontweight='bold', fontsize=14)
     
     # Add figure title and adjust layout
     fig.suptitle("RINA Network Performance Analysis", fontsize=20, fontweight='bold', y=0.98)
@@ -315,20 +246,6 @@ def export_to_csv(metrics):
         flow_df = pd.DataFrame(flow_data)
         flow_df.to_csv(output_path/"flow_control.csv", index=False)
     
-    # 7. Error recovery metrics
-    if metrics["error_recovery"]["recovery_time"]:
-        recovery_df = pd.DataFrame({
-            "recovery_time_seconds": metrics["error_recovery"]["recovery_time"],
-        })
-        recovery_df.to_csv(output_path/"error_recovery.csv", index=False)
-    
-    # 8. Flow setup performance
-    if metrics["scalability"]["concurrent_flows"] and metrics["scalability"]["flow_setup_times"]:
-        flow_setup_df = pd.DataFrame({
-            "concurrent_flows": metrics["scalability"]["concurrent_flows"],
-            "setup_time_seconds": metrics["scalability"]["flow_setup_times"]
-        })
-        flow_setup_df.to_csv(output_path/"flow_setup.csv", index=False)
     
     # 9. Summary metrics file
     summary_data = {
@@ -342,7 +259,6 @@ def export_to_csv(metrics):
             "avg_flow_setup_time_seconds",
             "window_efficiency_percent",
             "packet_loss_rate_percent",
-            "error_recovery_success_rate_percent"
         ],
         "value": [
             metrics["latency"]["average"],
@@ -359,7 +275,6 @@ def export_to_csv(metrics):
             metrics["scalability"]["avg_flow_setup_time"],
             metrics["flow"]["window_efficiency"],
             metrics["flow"]["packet_loss_rate"],
-            metrics["error_recovery"]["success_rate"]
         ]
     }
     summary_df = pd.DataFrame(summary_data)

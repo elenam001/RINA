@@ -2,7 +2,7 @@ import asyncio
 from enum import Enum, auto
 import time
 from collections import deque
-from .sequence import SequenceNumber  # Import the new SequenceNumber class
+from .sequence import SequenceNumber
 
 class Flow:
     def __init__(self, flow_id, src_ipcp, dest_ipcp, port, qos=None):
@@ -22,48 +22,31 @@ class Flow:
             'start_time': None,
             'end_time': None
         }
-        
-        # Flow control parameters
-        self.window_size = 64  # Default window size
-        self.timeout = 0.5     # Default timeout in seconds
-        
-        # Flow control state
+        self.window_size = 64
+        self.timeout = 0.5
         self.sequence_gen = SequenceNumber()
-        self.send_base = 0     # Base of the sending window
-        self.next_seq_num = 0  # Next sequence number to use
-        self.recv_base = 0     # Base of the receiving window
-        
-        # Buffers for unacknowledged and out-of-order packets
-        self.unacked_packets = {}  # seq_num -> (data, timestamp)
-        self.out_of_order_buffer = {}  # seq_num -> data
-        
-        # Flow control locks and event
+        self.send_base = 0    
+        self.next_seq_num = 0 
+        self.recv_base = 0
+        self.unacked_packets = {}
+        self.out_of_order_buffer = {}
         self.window_lock = asyncio.Lock()
         self.ack_received = asyncio.Event()
-        
-        # Retransmission task
         self.retransmission_task = None
         
     async def _commit_resources(self):
         """Commit resources in both source and destination DIFs"""
         if self.qos and self.qos.bandwidth:
-            # Ensure both DIFs have sufficient bandwidth
             src_allocation = self.src_ipcp.dif.allocate_bandwidth(self.qos.bandwidth)
-            
-            # If source and destination are in different DIFs, allocate in both
             dest_allocation = True
             if self.dest_ipcp.dif != self.src_ipcp.dif:
                 dest_allocation = self.dest_ipcp.dif.allocate_bandwidth(self.qos.bandwidth)
-                
-            # If either allocation fails, roll back and return failure
             if not src_allocation or not dest_allocation:
                 if src_allocation:
                     self.src_ipcp.dif.release_bandwidth(self.qos.bandwidth)
                 if dest_allocation and self.dest_ipcp.dif != self.src_ipcp.dif:
                     self.dest_ipcp.dif.release_bandwidth(self.qos.bandwidth)
                 return False
-            
-        # Handle lower layer flow allocation if needed
         if self.src_ipcp.lower_ipcp:
             self.lower_flow_id = await self.src_ipcp.lower_ipcp.allocate_flow(
                 self.dest_ipcp.lower_ipcp,
@@ -71,39 +54,30 @@ class Flow:
                 self.qos
             )
             if not self.lower_flow_id:
-                # Roll back resource allocations
                 if self.qos and self.qos.bandwidth:
                     self.src_ipcp.dif.release_bandwidth(self.qos.bandwidth)
                     if self.dest_ipcp.dif != self.src_ipcp.dif:
                         self.dest_ipcp.dif.release_bandwidth(self.qos.bandwidth)
                 return False
-            
-        # Successfully committed resources
         self.stats["start_time"] = time.time()
-        
-        # Start retransmission task
         self.retransmission_task = asyncio.create_task(self._retransmission_loop())
         
         return True
         
     async def _release_resources(self):
         """Release all allocated resources"""
-        # Cancel retransmission task
         if self.retransmission_task and not self.retransmission_task.done():
             self.retransmission_task.cancel()
             try:
                 await self.retransmission_task
             except asyncio.CancelledError:
                 pass
-            
         if self.qos and self.qos.bandwidth:
             self.src_ipcp.dif.release_bandwidth(self.qos.bandwidth)
             if self.dest_ipcp.dif != self.src_ipcp.dif:
                 self.dest_ipcp.dif.release_bandwidth(self.qos.bandwidth)
-            
         if self.lower_flow_id:
             await self.src_ipcp.lower_ipcp.deallocate_flow(self.lower_flow_id)
-            
         self.stats["end_time"] = time.time()
         self.state_machine.state = FlowAllocationFSM.State.CLOSED
     
@@ -113,30 +87,22 @@ class Flow:
             while True:
                 now = time.time()
                 retransmit_packets = []
-                
                 async with self.window_lock:
-                    # Find packets that have timed out
                     for seq_num, (data, timestamp) in list(self.unacked_packets.items()):
                         if now - timestamp > self.timeout:
                             retransmit_packets.append((seq_num, data))
-                
-                # Retransmit any timed-out packets
                 for seq_num, data in retransmit_packets:
-                    #print(f"Retransmitting packet {seq_num} for flow {self.id}")
+                    #print(qui)
                     await self._send_packet(data, seq_num, is_retransmission=True)
                     self.stats["retransmitted_packets"] += 1
-                
-                # Wait for a bit before checking again
                 await asyncio.sleep(0.1)
         except asyncio.CancelledError:
-            # Task was cancelled, clean up and exit
             pass
     
     async def _send_packet(self, data, seq_num=None, is_retransmission=False, already_stored=False):
         """Internal method to send a packet with sequence number"""
         if seq_num is None:
             seq_num = self.sequence_gen.next()
-        
         packet = {
             "seq_num": seq_num,
             "is_ack": False,
@@ -145,7 +111,6 @@ class Flow:
         if not already_stored and not is_retransmission:
             async with self.window_lock:
                 self.unacked_packets[seq_num] = (data, time.time())
-        
         self.stats['sent_packets'] += 1
         if self.lower_flow_id and self.src_ipcp.lower_ipcp:
             encapsulated = {
@@ -171,7 +136,7 @@ class Flow:
                     await asyncio.wait_for(self.ack_received.wait(), timeout=self.timeout)
                     self.ack_received.clear()
                 except asyncio.TimeoutError:
-                    print(f"Flow {self.id}: Timeout waiting for ACKs, retrying...")
+                    print("Timeout waiting for ACKs, retrying...")
                 finally:
                     await self.window_lock.acquire()
                     lock_reacquired = True
@@ -183,7 +148,7 @@ class Flow:
     async def receive_data(self, packet):
         """Process received data or acknowledgment packets"""
         if not isinstance(packet, dict):
-            print(f"Warning: Received malformed packet on flow {self.id}")
+            print("Malformed packet")
             return
         
         if packet.get("is_ack", False):
@@ -197,16 +162,14 @@ class Flow:
         """Process an acknowledgment packet"""
         ack_seq = ack_packet.get("ack_seq_num")
         if ack_seq is None:
-            print(f"Flow {self.id}: Received ACK with no sequence number")
+            print("Received ACK with no sequence number")
             return
         self.stats['ack_packets'] += 1
         async with self.window_lock:
             before_count = len(self.unacked_packets)
             if ack_seq in self.unacked_packets:
                 del self.unacked_packets[ack_seq]
-            
             after_count = len(self.unacked_packets)
-            #print(f"Flow {self.id}: Removed {before_count - after_count} packets from unacked")
         self.ack_received.set()
     
     async def _handle_data_packet(self, packet):
@@ -215,7 +178,7 @@ class Flow:
         data = packet.get("data")
         
         if seq_num is None or data is None:
-            print(f"Warning: Received data packet with missing fields on flow {self.id}")
+            print("Data packet with missing fields")
             return
         if seq_num == self.recv_base:
             await self.dest_ipcp.deliver_to_application(self.port, data)
@@ -224,15 +187,12 @@ class Flow:
                 buffered_data = self.out_of_order_buffer.pop(self.recv_base)
                 await self.dest_ipcp.deliver_to_application(self.port, buffered_data)
                 self.recv_base = (self.recv_base + 1) % (2**16)
-        
         elif self.sequence_gen.is_in_window(seq_num, self.recv_base, self.window_size):
             self.out_of_order_buffer[seq_num] = data
         ack_packet = {
             "is_ack": True,
-            "ack_seq_num": (self.recv_base - 1) % (2**16)  # ACK the last in-order packet
+            "ack_seq_num": (self.recv_base - 1) % (2**16)
         }
-        
-        # Send the ACK packet back
         await self.send_ack(ack_packet)
     
     async def send_ack(self, ack_packet):
@@ -247,7 +207,6 @@ class Flow:
             }
             await self.dest_ipcp.lower_ipcp.send_data(self.lower_flow_id, encapsulated)
         else:
-            # Direct delivery back to source
             await self.src_ipcp.receive_data(ack_packet, self.id)
 
 class FlowAllocationFSM:
@@ -277,7 +236,6 @@ class FlowAllocationFSM:
     async def start_allocation(self):
         self.state = self.State.REQUEST_SENT
         self.timeout_task = asyncio.create_task(self.allocation_timeout())
-        # Simplified for testing - just approve
         await self.confirm_allocation()
 
     async def allocation_timeout(self, timeout=5.0):
@@ -300,7 +258,6 @@ class FlowAllocationFSM:
     async def deallocate(self):
         if self.state not in [self.State.CLOSED, self.State.DEALLOCATING]:
             self.state = self.State.DEALLOCATING
-            # Cancel timeout task if it exists
             if self.timeout_task and not self.timeout_task.done():
                 self.timeout_task.cancel()
             await self.flow._release_resources()

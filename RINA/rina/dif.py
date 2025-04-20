@@ -35,8 +35,7 @@ class DIF:
     def allocate_bandwidth(self, bandwidth):
         """Allocate bandwidth from the DIF's capacity"""
         if bandwidth is None:
-            return True  # No bandwidth requirement
-            
+            return True
         if self.allocated_bandwidth + bandwidth <= self.max_bandwidth:
             self.allocated_bandwidth += bandwidth
             logging.debug(f"DIF {self.name}: Allocated {bandwidth} bandwidth, total now: {self.allocated_bandwidth}/{self.max_bandwidth}")
@@ -49,7 +48,6 @@ class DIF:
         """Release previously allocated bandwidth"""
         if bandwidth is None:
             return
-            
         self.allocated_bandwidth = max(0, self.allocated_bandwidth - bandwidth)
         logging.debug(f"DIF {self.name}: Released {bandwidth} bandwidth, total now: {self.allocated_bandwidth}/{self.max_bandwidth}")
 

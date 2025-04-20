@@ -11,8 +11,6 @@ class SequenceNumber:
     def is_in_window(self, seq_num, base, window_size):
         """Check if a sequence number is within a given window"""
         if base + window_size < self.max_seq:
-            # Window doesn't wrap around
             return base <= seq_num < base + window_size
         else:
-            # Window wraps around
             return seq_num >= base or seq_num < (base + window_size) % self.max_seq

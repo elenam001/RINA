@@ -1,0 +1,15 @@
+metric,value
+avg_latency_ms,16.34779155254364
+min_latency_ms,10.952949523925781
+max_latency_ms,26.011228561401367
+p95_latency_ms,17.77172088623047
+p99_latency_ms,23.95796775817871
+avg_jitter_ms,0.8324824198327884
+max_jitter_ms,10.837793350219727
+avg_throughput_mbps,6.4533172325607655
+packet_delivery_ratio_percent,10000.0
+avg_rtt_ms,16.27279758453369
+max_concurrent_flows,100.0
+avg_flow_setup_time_seconds,0.0028253396352132163
+window_efficiency_percent,100.0
+packet_loss_rate_percent,0.0
