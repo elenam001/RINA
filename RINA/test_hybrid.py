@@ -51,25 +51,29 @@ hybrid_metrics = {
 
 @pytest_asyncio.fixture
 async def setup_hybrid_network():
-    """Setup a hybrid network with both RINA and TCP/IP components"""
+    print("Setting up hybrid network...")
     network = HybridNetwork()
     
-    # Create RINA components
+    print("Creating RINA components...")
     rina_dif = await network.create_rina_dif("test_dif", layer=0, max_bandwidth=1000)
     ipcp1 = await network.create_rina_ipcp("ipcp1", "test_dif")
     ipcp2 = await network.create_rina_ipcp("ipcp2", "test_dif")
     await ipcp1.enroll(ipcp2)
+    print("RINA components created.")
     
-    # Create TCP components
+    print("Creating TCP adapters...")
     tcp_adapter1 = await network.create_tcp_adapter("adapter1", host='127.0.0.1', port=8001)
     tcp_adapter2 = await network.create_tcp_adapter("adapter2", host='127.0.0.1', port=8002)
+    print("TCP adapters created.")
     
-    # Connect TCP adapters to RINA
+    print("Connecting TCP adapters to RINA...")
     await network.connect_adapter_to_rina("adapter1", "ipcp1", "test_dif")
     await network.connect_adapter_to_rina("adapter2", "ipcp2", "test_dif")
+    print("TCP adapters connected to RINA.")
     
-    # Start TCP adapters
+    print("Starting TCP adapters...")
     await network.start_tcp_adapters()
+    print("TCP adapters started.")
     
     # Create applications
     rina_app1 = Application(name="rina_app1", ipcp=ipcp1)
@@ -123,10 +127,14 @@ async def test_throughput_by_size_hybrid(setup_hybrid_network):
     """Test throughput with different packet sizes in hybrid network"""
     network, ipcp1, ipcp2, _, _, hybrid_app1, hybrid_app2, adapter1, adapter2 = setup_hybrid_network
     
+    print("Setup completed, starting throughput test")
+
     # Test configurations
     packet_sizes = [64, 256, 512, 1024, 2048, 4096]
     chunks_per_size = 100
     
+    logging.info("Starting RINA throughput test")
+
     # Test pure RINA throughput
     rina_results = {}
     for size in packet_sizes:

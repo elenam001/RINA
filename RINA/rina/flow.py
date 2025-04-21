@@ -36,32 +36,42 @@ class Flow:
         
     async def _commit_resources(self):
         """Commit resources in both source and destination DIFs"""
+        print(f"Committing bandwidth resources for flow {self.id}")
         if self.qos and self.qos.bandwidth:
             src_allocation = self.src_ipcp.dif.allocate_bandwidth(self.qos.bandwidth)
             dest_allocation = True
             if self.dest_ipcp.dif != self.src_ipcp.dif:
                 dest_allocation = self.dest_ipcp.dif.allocate_bandwidth(self.qos.bandwidth)
             if not src_allocation or not dest_allocation:
+                print(f"Bandwidth allocation failed: src={src_allocation}, dest={dest_allocation}")
                 if src_allocation:
                     self.src_ipcp.dif.release_bandwidth(self.qos.bandwidth)
                 if dest_allocation and self.dest_ipcp.dif != self.src_ipcp.dif:
                     self.dest_ipcp.dif.release_bandwidth(self.qos.bandwidth)
                 return False
+            print(f"Bandwidth allocated successfully for flow {self.id}")
+        
+        print(f"Setting up lower flow for {self.id}")
         if self.src_ipcp.lower_ipcp:
+            print(f"Allocating lower flow from {self.src_ipcp.id} to {self.dest_ipcp.id}")
             self.lower_flow_id = await self.src_ipcp.lower_ipcp.allocate_flow(
                 self.dest_ipcp.lower_ipcp,
                 self.port,
                 self.qos
             )
+            print(f"Lower flow allocation result: {self.lower_flow_id}")
             if not self.lower_flow_id:
+                print(f"Lower flow allocation failed for {self.id}")
                 if self.qos and self.qos.bandwidth:
                     self.src_ipcp.dif.release_bandwidth(self.qos.bandwidth)
                     if self.dest_ipcp.dif != self.src_ipcp.dif:
                         self.dest_ipcp.dif.release_bandwidth(self.qos.bandwidth)
                 return False
+        
+        print(f"Starting retransmission task for flow {self.id}")
         self.stats["start_time"] = time.time()
         self.retransmission_task = asyncio.create_task(self._retransmission_loop())
-        
+        print(f"Resources committed successfully for flow {self.id}")
         return True
         
     async def _release_resources(self):
@@ -180,20 +190,27 @@ class Flow:
         if seq_num is None or data is None:
             print("Data packet with missing fields")
             return
-        if seq_num == self.recv_base:
-            await self.dest_ipcp.deliver_to_application(self.port, data)
-            self.recv_base = (self.recv_base + 1) % (2**16)
-            while self.recv_base in self.out_of_order_buffer:
-                buffered_data = self.out_of_order_buffer.pop(self.recv_base)
-                await self.dest_ipcp.deliver_to_application(self.port, buffered_data)
-                self.recv_base = (self.recv_base + 1) % (2**16)
-        elif self.sequence_gen.is_in_window(seq_num, self.recv_base, self.window_size):
-            self.out_of_order_buffer[seq_num] = data
+            
+        # Send acknowledgment first to prevent deadlock
         ack_packet = {
             "is_ack": True,
-            "ack_seq_num": (self.recv_base - 1) % (2**16)
+            "ack_seq_num": seq_num  # Use the received sequence number directly
         }
         await self.send_ack(ack_packet)
+        
+        # Then process the data
+        if seq_num == self.recv_base:
+            try:
+                await self.dest_ipcp.deliver_to_application(self.port, data)
+                self.recv_base = (self.recv_base + 1) % (2**16)
+                while self.recv_base in self.out_of_order_buffer:
+                    buffered_data = self.out_of_order_buffer.pop(self.recv_base)
+                    await self.dest_ipcp.deliver_to_application(self.port, buffered_data)
+                    self.recv_base = (self.recv_base + 1) % (2**16)
+            except Exception as e:
+                print(f"Error delivering data to application: {str(e)}")
+        elif self.sequence_gen.is_in_window(seq_num, self.recv_base, self.window_size):
+            self.out_of_order_buffer[seq_num] = data
     
     async def send_ack(self, ack_packet):
         """Send an acknowledgment packet"""

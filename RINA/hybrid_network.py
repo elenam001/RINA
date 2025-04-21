@@ -33,6 +33,15 @@ class TCPIPAdapter:
         )
         logging.info(f"TCP/IP Adapter listening on {self.host}:{self.port}")
         
+        # Start serving in a background task without awaiting it
+        asyncio.create_task(self._serve_forever())
+
+    async def _serve_forever(self):
+        """Background task to keep the server running"""
+        if self.server:
+            async with self.server:
+                await self.server.serve_forever()
+        
     async def handle_connection(self, reader, writer):
         """Handle incoming TCP connection"""
         addr = writer.get_extra_info('peername')
@@ -333,6 +342,7 @@ class HybridNetwork:
         """Start all TCP adapters"""
         for name, adapter in self.tcp_adapters.items():
             await adapter.start_server()
+            logging.info(f"Started TCP adapter: {name}")  # Add logging
     
     async def create_hybrid_application(self, name, ipcp, adapter_name=None):
         """Create an application that can work with both RINA and TCP/IP"""
