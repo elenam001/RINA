@@ -49,38 +49,47 @@ class TCPIPAdapter:
         self.connections[connection_id] = (reader, writer)
         logging.info(f"TCP Connection from {connection_id}")
         
-        # Map this connection to a RINA flow if connected to RINA
         if self.rina_ipcp:
-            # Allocate a flow in the RINA network
-            flow_id = await self.allocate_rina_flow(connection_id)
-            if flow_id:
-                try:
-                    await self.tcp_to_rina_bridge(connection_id, flow_id, reader, writer)
-                except Exception as e:
-                    logging.error(f"Bridge error: {str(e)}")
-                finally:
-                    if connection_id in self.connections:
-                        del self.connections[connection_id]
-                    await self.rina_ipcp.deallocate_flow(flow_id)
-        else:
-            # Just handle the TCP connection directly if not bridging
+            # Allocate RINA flow and bridge
             try:
+                flow_id = await self.allocate_rina_flow(connection_id)
+                if flow_id:
+                    await self.tcp_to_rina_bridge(connection_id, flow_id, reader, writer)
+                else:
+                    raise Exception("Failed to allocate RINA flow")
+            except Exception as e:
+                logging.error(f"Error bridging TCP to RINA: {str(e)}")
+                writer.close()
+                await writer.wait_closed()
+            finally:
+                if connection_id in self.connections:
+                    del self.connections[connection_id]
+        else:
+            try:
+                # Add timeout to prevent hanging on read
                 while True:
-                    data = await reader.read(4096)
-                    if not data:
+                    try:
+                        data = await asyncio.wait_for(reader.read(4096), timeout=2.0)
+                        if not data:
+                            break
+                        self.stats['received_packets'] += 1
+                        self.stats['bytes_received'] += len(data)
+                        # Echo it back for simple testing
+                        writer.write(data)
+                        await writer.drain()
+                        self.stats['sent_packets'] += 1
+                        self.stats['bytes_sent'] += len(data)
+                    except asyncio.TimeoutError:
+                        logging.warning(f"Read timeout for {connection_id}")
                         break
-                    self.stats['received_packets'] += 1
-                    self.stats['bytes_received'] += len(data)
-                    # Echo it back for simple testing
-                    writer.write(data)
-                    await writer.drain()
-                    self.stats['sent_packets'] += 1
-                    self.stats['bytes_sent'] += len(data)
             except Exception as e:
                 logging.error(f"TCP connection error: {str(e)}")
             finally:
-                writer.close()
-                await writer.wait_closed()
+                try:
+                    writer.close()
+                    await asyncio.wait_for(writer.wait_closed(), timeout=1.0)
+                except Exception as e:
+                    logging.error(f"Error closing connection: {str(e)}")
                 if connection_id in self.connections:
                     del self.connections[connection_id]
     
@@ -214,11 +223,17 @@ class TCPIPAdapter:
         """Stop the TCP server and close all connections"""
         if self.server:
             self.server.close()
-            await self.server.wait_closed()
+            try:
+                await asyncio.wait_for(self.server.wait_closed(), timeout=2.0)
+            except asyncio.TimeoutError:
+                logging.warning("Timeout waiting for server to close")
         
-        for reader, writer in self.connections.values():
-            writer.close()
-            await writer.wait_closed()
+        for conn_id, (reader, writer) in list(self.connections.items()):
+            try:
+                writer.close()
+                await asyncio.wait_for(writer.wait_closed(), timeout=1.0)
+            except Exception as e:
+                logging.error(f"Error closing connection {conn_id}: {str(e)}")
         self.connections.clear()
         
         logging.info("TCP/IP Adapter closed")
@@ -356,16 +371,28 @@ class HybridNetwork:
     
     async def shutdown(self):
         """Shutdown the entire hybrid network"""
+        logging.info("Starting hybrid network shutdown...")
+        
         # Close all RINA apps TCP connections
-        for app in self.rina_apps.values():
+        for name, app in self.rina_apps.items():
+            logging.info(f"Closing TCP connections for RINA app: {name}")
             await app.close_all_tcp()
         
         # Close all TCP adapters
-        for adapter in self.tcp_adapters.values():
+        for name, adapter in self.tcp_adapters.items():
+            logging.info(f"Closing TCP adapter: {name}")
             await adapter.close()
         
         # Clean up RINA flows
-        for dif in self.rina_difs.values():
+        for name, dif in self.rina_difs.items():
+            logging.info(f"Cleaning up DIF: {name}")
             for ipcp in dif.get_ipcps():
-                for flow_id in list(ipcp.flows.keys()):
-                    await ipcp.deallocate_flow(flow_id)
+                flow_ids = list(ipcp.flows.keys())
+                for flow_id in flow_ids:
+                    logging.info(f"Deallocating flow: {flow_id}")
+                    try:
+                        await asyncio.wait_for(ipcp.deallocate_flow(flow_id), timeout=2.0)
+                    except Exception as e:
+                        logging.error(f"Error deallocating flow {flow_id}: {str(e)}")
+        
+        logging.info("Hybrid network shutdown complete")

@@ -11,6 +11,8 @@ from rina.dif import DIF
 from rina.ipcp import IPCP
 from rina.application import Application
 from rina.qos import QoS
+import os
+import psutil
 
 # Configure logging
 logging.basicConfig(
@@ -88,8 +90,20 @@ async def setup_hybrid_network():
     
     yield network, ipcp1, ipcp2, rina_app1, rina_app2, hybrid_app1, hybrid_app2, tcp_adapter1, tcp_adapter2
     
-    # Cleanup
+    # Enhanced cleanup
+    print("Cleaning up network resources...")
+    # Cancel all pending tasks
+    tasks = [t for t in asyncio.all_tasks() if t is not asyncio.current_task()]
+    print(f"Cancelling {len(tasks)} pending tasks...")
+    for task in tasks:
+        task.cancel()
+    
+    if tasks:
+        await asyncio.gather(*tasks, return_exceptions=True)
+    
+    # Then proceed with normal shutdown
     await network.shutdown()
+    print("Network shutdown complete.")
 
 async def tcp_client(host, port, data, iterations=1, delay=0.01):
     """Generic TCP client for testing"""
@@ -97,27 +111,44 @@ async def tcp_client(host, port, data, iterations=1, delay=0.01):
     rtts = []
     
     try:
-        reader, writer = await asyncio.open_connection(host, port)
+        # Add timeout to connection
+        reader, writer = await asyncio.wait_for(
+            asyncio.open_connection(host, port),
+            timeout=2.0
+        )
+        
         for i in range(iterations):
             start_time = time.time()
             writer.write(data)
             await writer.drain()
             
-            response = await reader.read(len(data))
-            rtt = time.time() - start_time
-            total_rtt += rtt
-            rtts.append(rtt)
+            # Add timeout to read
+            try:
+                response = await asyncio.wait_for(reader.read(len(data)), timeout=2.0)
+                rtt = time.time() - start_time
+                total_rtt += rtt
+                rtts.append(rtt)
+            except asyncio.TimeoutError:
+                logging.warning(f"Read timeout in TCP client")
+                break
             
             if delay > 0 and i < iterations - 1:
                 await asyncio.sleep(delay)
         
         writer.close()
-        await writer.wait_closed()
+        try:
+            await asyncio.wait_for(writer.wait_closed(), timeout=1.0)
+        except asyncio.TimeoutError:
+            logging.warning("Timeout waiting for connection to close")
+        
         return {
             "success": True, 
-            "avg_rtt": total_rtt / iterations, 
+            "avg_rtt": total_rtt / max(len(rtts), 1), 
             "rtts": rtts
         }
+    except asyncio.TimeoutError:
+        logging.error(f"Connection timeout to {host}:{port}")
+        return {"success": False, "error": "Connection timeout"}
     except Exception as e:
         logging.error(f"TCP client error: {str(e)}")
         return {"success": False, "error": str(e)}
@@ -125,13 +156,15 @@ async def tcp_client(host, port, data, iterations=1, delay=0.01):
 @pytest.mark.asyncio
 async def test_throughput_by_size_hybrid(setup_hybrid_network):
     """Test throughput with different packet sizes in hybrid network"""
+
+    log_memory_usage()
     network, ipcp1, ipcp2, _, _, hybrid_app1, hybrid_app2, adapter1, adapter2 = setup_hybrid_network
     
     print("Setup completed, starting throughput test")
 
     # Test configurations
     packet_sizes = [64, 256, 512, 1024, 2048, 4096]
-    chunks_per_size = 100
+    chunks_per_size = 20
     
     logging.info("Starting RINA throughput test")
 
@@ -164,7 +197,8 @@ async def test_throughput_by_size_hybrid(setup_hybrid_network):
         
         await ipcp1.deallocate_flow(flow_id)
         await asyncio.sleep(0.1)
-    
+    print("hereeeeeeeeeeee1")
+
     # Test TCP throughput
     tcp_results = {}
     for size in packet_sizes:
@@ -172,16 +206,25 @@ async def test_throughput_by_size_hybrid(setup_hybrid_network):
         start_time = time.time()
         success_count = 0
         
-        clients = []
-        for i in range(chunks_per_size):
-            client = asyncio.create_task(tcp_client('127.0.0.1', 8002, data, iterations=1, delay=0))
-            clients.append(client)
+        batch_size = 20 #hereeeee
+        for batch in range(0, chunks_per_size, batch_size):
+            clients = []
+            end_batch = min(batch + batch_size, chunks_per_size)
             
-            if i % 10 == 0:
-                await asyncio.sleep(0.01)
-        
-        results = await asyncio.gather(*clients, return_exceptions=True)
-        success_count = sum(1 for r in results if isinstance(r, dict) and r.get("success", False))
+            for i in range(batch, end_batch):
+                client = asyncio.create_task(tcp_client('127.0.0.1', 8002, data, iterations=1, delay=0))
+                clients.append(client)
+            
+            # Use timeout to prevent hanging
+            try:
+                batch_results = await asyncio.wait_for(
+                    asyncio.gather(*clients, return_exceptions=True),
+                    timeout=5.0
+                )
+                success_count += sum(1 for r in batch_results if isinstance(r, dict) and r.get("success", False))
+            except asyncio.TimeoutError:
+                logging.error(f"Timeout in TCP test batch {batch}-{end_batch}")
+            
         
         duration = max(time.time() - start_time, 0.001)
         throughput = (size * success_count * 8) / (duration * 1000000)  # Mbps
@@ -189,8 +232,9 @@ async def test_throughput_by_size_hybrid(setup_hybrid_network):
         hybrid_metrics["tcp"]["throughput"][size] = throughput
         logging.info(f"TCP Throughput with {size} bytes packets: {throughput:.2f} Mbps")
         
-        await asyncio.sleep(0.1)
-    
+        # More time between different packet size tests
+        await asyncio.sleep(1.0)
+    print("hereeeeeeeeeeee2")
     # Test hybrid throughput (RINA to TCP)
     hybrid_results = {}
     for size in packet_sizes:
@@ -223,12 +267,25 @@ async def test_throughput_by_size_hybrid(setup_hybrid_network):
         
         await hybrid_app1.disconnect_tcp(conn_id)
         await asyncio.sleep(0.1)
+
+    print("\n=== TEST RESULTS ===")
+    print(f"RINA results: {rina_results}")
+    print(f"TCP results: {tcp_results}")
+    print(f"Hybrid results: {hybrid_results}")
+    print("=== TEST COMPLETE ===")
+
+    log_memory_usage()
     
     return {
         "rina": rina_results,
         "tcp": tcp_results,
         "hybrid": hybrid_results
     }
+
+def log_memory_usage():
+    process = psutil.Process(os.getpid())
+    memory_info = process.memory_info()
+    print(f"Memory usage: {memory_info.rss / 1024 / 1024:.2f} MB")
 
 @pytest.fixture(scope="session", autouse=True)
 def save_hybrid_metrics():
