@@ -27,38 +27,28 @@ class IPCP:
         """Allocate a flow between this IPCP and a destination IPCP."""
         try:
             flow_id = str(uuid.uuid4())
-            print(f"Creating flow {flow_id} from IPCP {self.id} to {dest_ipcp.id} on port {port}")
             flow = Flow(flow_id, self, dest_ipcp, port, qos)
             flow.state_machine = FlowAllocationFSM(flow)
             self.flows[flow_id] = flow
             dest_ipcp.flows[flow_id] = flow
             
-            print(f"Validating flow request for {flow_id}")
             validation_result = await self._validate_flow_request(flow)
             if not validation_result:
-                print(f"Flow request validation failed for flow {flow_id}")
                 del self.flows[flow_id]
                 if flow_id in dest_ipcp.flows:
                     del dest_ipcp.flows[flow_id]
                 return None
             
-            print(f"Handling flow request for {flow_id}")
             allocation_result = await self._handle_flow_request(flow)
             if not allocation_result:
-                print(f"Flow allocation request rejected for flow {flow_id}")
                 del self.flows[flow_id]
                 if flow_id in dest_ipcp.flows:
                     del dest_ipcp.flows[flow_id]
                 return None
             
-            print(f"Starting allocation for flow {flow_id}")
             await flow.state_machine.handle_event("start_allocation")
             
-            print(f"Committing resources for flow {flow_id}")
             resource_result = await flow._commit_resources()
-            print(f"Resource commitment result: {resource_result}")
-            
-            print(f"Flow {flow_id} allocation completed successfully")
             return flow_id
         except Exception as e:
             print(f"Flow allocation failed with exception: {str(e)}")

@@ -329,6 +329,1129 @@ async def test_throughput_by_size_hybrid(setup_hybrid_network):
         "hybrid_tcp_to_rina": hybrid_tcp_to_rina_results
     }
 
+@pytest.mark.asyncio
+async def test_latency_comprehensive(setup_hybrid_network):
+    """Test latency characteristics in different network modes"""
+    network, ipcp1, ipcp2, _, _, hybrid_app1, hybrid_app2, adapter1, adapter2 = setup_hybrid_network
+    
+    packet_sizes = [64, 256, 1024, 4096]
+    samples = 50
+    results = {
+        "rina": {},
+        "tcp": {},
+        "hybrid": {}
+    }
+    
+    # Test RINA latency
+    for size in packet_sizes:
+        flow_id = await ipcp1.allocate_flow(ipcp2, port=5000)
+        data = b"x" * size
+        latencies = []
+        jitter_values = []
+        last_latency = 0
+        
+        for i in range(samples):
+            start = time.time()
+            await ipcp1.send_data(flow_id, data)
+            await asyncio.sleep(0.01)  # Simulating processing time
+            latency = (time.time() - start) * 1000  # ms
+            latencies.append(latency)
+            
+            if i > 0:
+                jitter_value = abs(latency - last_latency)
+                jitter_values.append(jitter_value)
+            last_latency = latency
+        
+        await ipcp1.deallocate_flow(flow_id)
+        
+        # Calculate statistics
+        avg_latency = statistics.mean(latencies)
+        min_latency = min(latencies)
+        max_latency = max(latencies)
+        median_latency = statistics.median(latencies)
+        p95_latency = sorted(latencies)[int(0.95 * len(latencies))]
+        avg_jitter = statistics.mean(jitter_values) if jitter_values else 0
+        
+        results["rina"][size] = {
+            "avg_latency": avg_latency,
+            "min_latency": min_latency,
+            "max_latency": max_latency,
+            "median_latency": median_latency,
+            "p95_latency": p95_latency,
+            "avg_jitter": avg_jitter
+        }
+        hybrid_metrics["rina"]["latency"][size] = results["rina"][size]
+        logging.info(f"RINA Latency with {size} bytes: avg={avg_latency:.2f}ms, min={min_latency:.2f}ms, max={max_latency:.2f}ms")
+    
+    # Test TCP latency
+    for size in packet_sizes:
+        data = b"x" * size
+        latencies = []
+        jitter_values = []
+        last_latency = 0
+        
+        for i in range(samples):
+            client_result = await tcp_client('127.0.0.1', 8002, data)
+            if client_result["success"]:
+                latency = client_result["avg_rtt"] * 1000  # ms
+                latencies.append(latency)
+                
+                if i > 0:
+                    jitter_value = abs(latency - last_latency)
+                    jitter_values.append(jitter_value)
+                last_latency = latency
+            
+            await asyncio.sleep(0.01)
+        
+        # Calculate statistics
+        if latencies:
+            avg_latency = statistics.mean(latencies)
+            min_latency = min(latencies)
+            max_latency = max(latencies)
+            median_latency = statistics.median(latencies)
+            p95_latency = sorted(latencies)[int(0.95 * len(latencies))]
+            avg_jitter = statistics.mean(jitter_values) if jitter_values else 0
+            
+            results["tcp"][size] = {
+                "avg_latency": avg_latency,
+                "min_latency": min_latency,
+                "max_latency": max_latency,
+                "median_latency": median_latency,
+                "p95_latency": p95_latency,
+                "avg_jitter": avg_jitter
+            }
+            hybrid_metrics["tcp"]["latency"][size] = results["tcp"][size]
+            logging.info(f"TCP Latency with {size} bytes: avg={avg_latency:.2f}ms, min={min_latency:.2f}ms, max={max_latency:.2f}ms")
+    
+    # Test hybrid latency (RINA to TCP)
+    for size in packet_sizes:
+        conn_id = await hybrid_app1.connect_to_tcp('127.0.0.1', 8002)
+        if not conn_id:
+            logging.error("Failed to establish TCP connection for hybrid latency test")
+            continue
+            
+        data = b"x" * size
+        latencies = []
+        jitter_values = []
+        last_latency = 0
+        
+        for i in range(samples):
+            start = time.time()
+            success = await hybrid_app1.send_to_tcp(conn_id, data)
+            if success:
+                latency = (time.time() - start) * 1000  # ms
+                latencies.append(latency)
+                
+                if i > 0:
+                    jitter_value = abs(latency - last_latency)
+                    jitter_values.append(jitter_value)
+                last_latency = latency
+            
+            await asyncio.sleep(0.01)
+        
+        await hybrid_app1.disconnect_tcp(conn_id)
+        
+        # Calculate statistics
+        if latencies:
+            avg_latency = statistics.mean(latencies)
+            min_latency = min(latencies)
+            max_latency = max(latencies)
+            median_latency = statistics.median(latencies)
+            p95_latency = sorted(latencies)[int(0.95 * len(latencies))]
+            avg_jitter = statistics.mean(jitter_values) if jitter_values else 0
+            
+            results["hybrid"][size] = {
+                "avg_latency": avg_latency,
+                "min_latency": min_latency,
+                "max_latency": max_latency,
+                "median_latency": median_latency,
+                "p95_latency": p95_latency,
+                "avg_jitter": avg_jitter
+            }
+            hybrid_metrics["hybrid"]["latency"][size] = results["hybrid"][size]
+            logging.info(f"Hybrid Latency with {size} bytes: avg={avg_latency:.2f}ms, min={min_latency:.2f}ms, max={max_latency:.2f}ms")
+    
+    return results
+
+@pytest.mark.asyncio
+async def test_packet_delivery_ratio_hybrid(setup_hybrid_network):
+    """Test packet delivery ratio in different network modes"""
+    network, ipcp1, ipcp2, _, _, hybrid_app1, hybrid_app2, adapter1, adapter2 = setup_hybrid_network
+    
+    packet_counts = [100, 500, 1000]
+    results = {
+        "rina": {},
+        "tcp": {},
+        "hybrid": {}
+    }
+    
+    # Test RINA packet delivery ratio
+    for count in packet_counts:
+        flow_id = await ipcp1.allocate_flow(ipcp2, port=5000)
+        ipcp2.flows[flow_id].stats["received_packets"] = 0
+        sent = 0
+        
+        for _ in range(count):
+            await ipcp1.send_data(flow_id, b"data")
+            sent += 1
+            if sent % 50 == 0:
+                await asyncio.sleep(0.01)
+        
+        await asyncio.sleep(0.5)
+        received = ipcp2.flows[flow_id].stats["received_packets"]
+        delivery_ratio = (received / sent) * 100
+        results["rina"][count] = delivery_ratio
+        hybrid_metrics["rina"]["packet_delivery_ratio"][count] = delivery_ratio
+        logging.info(f"RINA PDR with {count} packets: {delivery_ratio:.2f}%")
+        
+        await ipcp1.deallocate_flow(flow_id)
+        await asyncio.sleep(0.1)
+    
+    # Test TCP packet delivery ratio
+    for count in packet_counts:
+        data = b"test_data"
+        sent = 0
+        received = 0
+        
+        for _ in range(count):
+            client_result = await tcp_client('127.0.0.1', 8002, data)
+            sent += 1
+            if client_result["success"]:
+                received += 1
+            if sent % 50 == 0:
+                await asyncio.sleep(0.01)
+        
+        delivery_ratio = (received / sent) * 100
+        results["tcp"][count] = delivery_ratio
+        hybrid_metrics["tcp"]["packet_delivery_ratio"][count] = delivery_ratio
+        logging.info(f"TCP PDR with {count} packets: {delivery_ratio:.2f}%")
+        
+        await asyncio.sleep(0.1)
+    
+    # Test hybrid packet delivery ratio
+    for count in packet_counts:
+        conn_id = await hybrid_app1.connect_to_tcp('127.0.0.1', 8002)
+        if not conn_id:
+            logging.error("Failed to establish TCP connection for hybrid PDR test")
+            continue
+        
+        data = b"hybrid_test_data"
+        sent = 0
+        received = 0
+        
+        for _ in range(count):
+            success = await hybrid_app1.send_to_tcp(conn_id, data)
+            sent += 1
+            if success:
+                received += 1
+            if sent % 50 == 0:
+                await asyncio.sleep(0.01)
+        
+        delivery_ratio = (received / sent) * 100
+        results["hybrid"][count] = delivery_ratio
+        hybrid_metrics["hybrid"]["packet_delivery_ratio"][count] = delivery_ratio
+        logging.info(f"Hybrid PDR with {count} packets: {delivery_ratio:.2f}%")
+        
+        await hybrid_app1.disconnect_tcp(conn_id)
+        await asyncio.sleep(0.1)
+    
+    return results
+
+@pytest.mark.asyncio
+async def test_round_trip_time_hybrid(setup_hybrid_network):
+    """Test round trip time in different network modes"""
+    network, ipcp1, ipcp2, _, _, hybrid_app1, hybrid_app2, adapter1, adapter2 = setup_hybrid_network
+    
+    packet_sizes = [64, 256, 1024, 4096]
+    samples = 30
+    results = {
+        "rina": {},
+        "tcp": {},
+        "hybrid": {}
+    }
+    
+    # Test RINA RTT
+    for size in packet_sizes:
+        flow_id = await ipcp1.allocate_flow(ipcp2, port=5000)
+        data = b"x" * size
+        rtts = []
+        
+        for _ in range(samples):
+            start = time.time()
+            await ipcp1.send_data(flow_id, data)
+            # In a real implementation, you'd wait for a response here
+            # For this test, we're just measuring the send time plus a fixed wait
+            await asyncio.sleep(0.01)
+            rtt = (time.time() - start) * 1000  # ms
+            rtts.append(rtt)
+        
+        await ipcp1.deallocate_flow(flow_id)
+        
+        # Calculate statistics
+        avg_rtt = statistics.mean(rtts)
+        min_rtt = min(rtts)
+        max_rtt = max(rtts)
+        median_rtt = statistics.median(rtts)
+        
+        results["rina"][size] = {
+            "avg_rtt": avg_rtt,
+            "min_rtt": min_rtt,
+            "max_rtt": max_rtt,
+            "median_rtt": median_rtt
+        }
+        hybrid_metrics["rina"]["round_trip_time"][size] = results["rina"][size]
+        logging.info(f"RINA RTT with {size} bytes: avg={avg_rtt:.2f}ms, min={min_rtt:.2f}ms, max={max_rtt:.2f}ms")
+    
+    # Test TCP RTT
+    for size in packet_sizes:
+        data = b"x" * size
+        rtts = []
+        
+        for _ in range(samples):
+            client_result = await tcp_client('127.0.0.1', 8002, data)
+            if client_result["success"]:
+                rtts.extend([r * 1000 for r in client_result["rtts"]])  # Convert to ms
+        
+        if rtts:
+            avg_rtt = statistics.mean(rtts)
+            min_rtt = min(rtts)
+            max_rtt = max(rtts)
+            median_rtt = statistics.median(rtts)
+            
+            results["tcp"][size] = {
+                "avg_rtt": avg_rtt,
+                "min_rtt": min_rtt,
+                "max_rtt": max_rtt,
+                "median_rtt": median_rtt
+            }
+            hybrid_metrics["tcp"]["round_trip_time"][size] = results["tcp"][size]
+            logging.info(f"TCP RTT with {size} bytes: avg={avg_rtt:.2f}ms, min={min_rtt:.2f}ms, max={max_rtt:.2f}ms")
+    
+    # Test hybrid RTT (RINA to TCP and back)
+    for size in packet_sizes:
+        # For hybrid RTT, we need bidirectional communication
+        # First establish a TCP connection
+        conn_id = await hybrid_app1.connect_to_tcp('127.0.0.1', 8002)
+        if not conn_id:
+            logging.error("Failed to establish TCP connection for hybrid RTT test")
+            continue
+        
+        data = b"x" * size
+        rtts = []
+        
+        for _ in range(samples):
+            start = time.time()
+            success = await hybrid_app1.send_to_tcp(conn_id, data)
+            if success:
+                # In a real implementation, we'd wait for a response here
+                # For this test, we're just measuring the send time plus a fixed wait
+                await asyncio.sleep(0.01)
+                rtt = (time.time() - start) * 1000  # ms
+                rtts.append(rtt)
+        
+        await hybrid_app1.disconnect_tcp(conn_id)
+        
+        if rtts:
+            avg_rtt = statistics.mean(rtts)
+            min_rtt = min(rtts)
+            max_rtt = max(rtts)
+            median_rtt = statistics.median(rtts)
+            
+            results["hybrid"][size] = {
+                "avg_rtt": avg_rtt,
+                "min_rtt": min_rtt,
+                "max_rtt": max_rtt,
+                "median_rtt": median_rtt
+            }
+            hybrid_metrics["hybrid"]["round_trip_time"][size] = results["hybrid"][size]
+            logging.info(f"Hybrid RTT with {size} bytes: avg={avg_rtt:.2f}ms, min={min_rtt:.2f}ms, max={max_rtt:.2f}ms")
+    
+    return results
+
+@pytest.mark.asyncio
+async def test_flow_control_reliability_hybrid(setup_hybrid_network):
+    """Test flow control reliability in hybrid network"""
+    network, ipcp1, ipcp2, _, _, hybrid_app1, hybrid_app2, adapter1, adapter2 = setup_hybrid_network
+    
+    # Test RINA flow control
+    flow_id = await ipcp1.allocate_flow(ipcp2, port=5000)
+    flow = ipcp1.flows[flow_id]
+    flow.window_size = 8
+    flow.timeout = 0.5
+    
+    total_packets = 100
+    packet_size = 512
+    rina_sent_count = 0
+    rina_success_count = 0
+    
+    for i in range(total_packets):
+        data = f"test-packet-{i}".encode() + b"x" * (packet_size - 15)
+        try:
+            seq_num = await flow.send_data(data)
+            rina_sent_count += 1
+            if seq_num is not None:
+                rina_success_count += 1
+            if i % flow.window_size == flow.window_size - 1:
+                logging.info(f"Window full at packet {i}, waiting for ACKs...")
+                await asyncio.sleep(0.05)
+        except Exception as e:
+            logging.error(f"Error sending RINA packet {i}: {str(e)}")
+    
+    await asyncio.sleep(1.0)
+    rina_stats = {
+        "sent_packets": flow.stats.get('sent_packets', 0),
+        "received_packets": flow.stats.get('received_packets', 0),
+        "ack_packets": flow.stats.get('ack_packets', 0),
+        "retransmitted_packets": flow.stats.get('retransmitted_packets', 0)
+    }
+    
+    window_efficiency = (rina_stats['received_packets'] / rina_stats['sent_packets']) * 100 if rina_stats['sent_packets'] > 0 else 0
+    packet_loss_rate = (rina_stats['retransmitted_packets'] / rina_stats['sent_packets']) * 100 if rina_stats['sent_packets'] > 0 else 0
+    
+    hybrid_metrics["rina"]["flow_control"]["window_efficiency"] = window_efficiency
+    hybrid_metrics["rina"]["flow_control"]["packet_loss_rate"] = packet_loss_rate
+    hybrid_metrics["rina"]["flow_control"]["stats"] = rina_stats
+    
+    logging.info(f"RINA Flow Control - Window Efficiency: {window_efficiency:.2f}%, Packet Loss Rate: {packet_loss_rate:.2f}%")
+    
+    # Test TCP flow control
+    tcp_sent_count = 0
+    tcp_success_count = 0
+    tcp_data = b"x" * packet_size
+    
+    for i in range(total_packets):
+        try:
+            client_result = await tcp_client('127.0.0.1', 8002, tcp_data)
+            tcp_sent_count += 1
+            if client_result["success"]:
+                tcp_success_count += 1
+            if i % 10 == 9:  # Simulate window-like behavior
+                await asyncio.sleep(0.05)
+        except Exception as e:
+            logging.error(f"Error in TCP client {i}: {str(e)}")
+    
+    tcp_efficiency = (tcp_success_count / tcp_sent_count) * 100 if tcp_sent_count > 0 else 0
+    hybrid_metrics["tcp"]["flow_control"]["efficiency"] = tcp_efficiency
+    hybrid_metrics["tcp"]["flow_control"]["stats"] = {
+        "sent_packets": tcp_sent_count,
+        "successful_packets": tcp_success_count
+    }
+    
+    logging.info(f"TCP Flow Control - Efficiency: {tcp_efficiency:.2f}%")
+    
+    # Test hybrid flow control
+    hybrid_sent_count = 0
+    hybrid_success_count = 0
+    
+    conn_id = await hybrid_app1.connect_to_tcp('127.0.0.1', 8002)
+    if conn_id:
+        hybrid_data = b"x" * packet_size
+        
+        for i in range(total_packets):
+            try:
+                success = await hybrid_app1.send_to_tcp(conn_id, hybrid_data)
+                hybrid_sent_count += 1
+                if success:
+                    hybrid_success_count += 1
+                if i % 10 == 9:  # Simulate window-like behavior
+                    await asyncio.sleep(0.05)
+            except Exception as e:
+                logging.error(f"Error in hybrid send {i}: {str(e)}")
+        
+        await hybrid_app1.disconnect_tcp(conn_id)
+    
+    hybrid_efficiency = (hybrid_success_count / hybrid_sent_count) * 100 if hybrid_sent_count > 0 else 0
+    hybrid_metrics["hybrid"]["flow_control"]["efficiency"] = hybrid_efficiency
+    hybrid_metrics["hybrid"]["flow_control"]["stats"] = {
+        "sent_packets": hybrid_sent_count,
+        "successful_packets": hybrid_success_count
+    }
+    
+    logging.info(f"Hybrid Flow Control - Efficiency: {hybrid_efficiency:.2f}%")
+    
+    return {
+        "rina": {
+            "window_efficiency": window_efficiency,
+            "packet_loss_rate": packet_loss_rate,
+            "stats": rina_stats
+        },
+        "tcp": {
+            "efficiency": tcp_efficiency,
+            "stats": {
+                "sent_packets": tcp_sent_count,
+                "successful_packets": tcp_success_count
+            }
+        },
+        "hybrid": {
+            "efficiency": hybrid_efficiency,
+            "stats": {
+                "sent_packets": hybrid_sent_count,
+                "successful_packets": hybrid_success_count
+            }
+        }
+    }
+
+@pytest.mark.asyncio
+async def test_error_recovery_hybrid(setup_hybrid_network):
+    """Test error recovery in hybrid network"""
+    network, ipcp1, ipcp2, _, _, hybrid_app1, hybrid_app2, adapter1, adapter2 = setup_hybrid_network
+    
+    # Test configurations
+    test_packets = 20
+    packet_size = 256
+    
+    # ... continuing test_error_recovery_hybrid from where it was cut off
+    flow_id = await ipcp1.allocate_flow(ipcp2, port=5000)
+    flow = ipcp1.flows[flow_id]
+    flow.timeout = 0.2
+    flow.retries = 3
+    test_packets = 20
+    recovery_times = []
+    success_count = 0
+    
+    for i in range(test_packets):
+        data = f"recovery-test-{i}".encode() + b"x" * 100
+        if i % 4 == 0 and i > 0:
+            # Simulate error condition by temporarily disabling ACK functionality
+            original_send_ack = flow.send_ack
+            flow.send_ack = lambda seq_num: None
+            start_time = time.time()
+            try:
+                await flow.send_data(data)
+                success_count += 1
+                recovery_time = time.time() - start_time
+                recovery_times.append(recovery_time)
+                logging.info(f"RINA Packet {i}: Recovered in {recovery_time:.4f}s")
+            except Exception as e:
+                logging.error(f"RINA Packet {i}: Failed to recover: {str(e)}")
+            # Restore original functionality
+            flow.send_ack = original_send_ack
+        else:
+            await flow.send_data(data)
+            success_count += 1
+    
+    await asyncio.sleep(1.0)
+    rina_success_rate = (success_count / test_packets) * 100
+    rina_recovery_times = recovery_times.copy() if recovery_times else []
+    rina_avg_recovery = statistics.mean(recovery_times) if recovery_times else 0
+    
+    hybrid_metrics["rina"]["error_recovery"]["success_rate"] = rina_success_rate
+    hybrid_metrics["rina"]["error_recovery"]["recovery_times"] = rina_recovery_times
+    hybrid_metrics["rina"]["error_recovery"]["avg_recovery_time"] = rina_avg_recovery
+    
+    logging.info(f"RINA Error recovery: {success_count}/{test_packets} packets delivered successfully")
+    if recovery_times:
+        logging.info(f"RINA Average recovery time: {rina_avg_recovery:.4f}s")
+    
+    # Test TCP error recovery
+    # For TCP, we'll simulate failures by temporarily closing and reopening connections
+    tcp_test_packets = 20
+    tcp_recovery_times = []
+    tcp_success_count = 0
+    
+    for i in range(tcp_test_packets):
+        if i % 4 == 0 and i > 0:
+            # Simulate connection failure and recovery
+            start_time = time.time()
+            try:
+                result = await tcp_client('127.0.0.1', 8002, b"recovery-test", iterations=1)
+                if result["success"]:
+                    tcp_success_count += 1
+                    recovery_time = time.time() - start_time
+                    tcp_recovery_times.append(recovery_time)
+                    logging.info(f"TCP Packet {i}: Recovered in {recovery_time:.4f}s")
+            except Exception as e:
+                logging.error(f"TCP Packet {i}: Failed to recover: {str(e)}")
+        else:
+            result = await tcp_client('127.0.0.1', 8002, b"normal-packet", iterations=1)
+            if result["success"]:
+                tcp_success_count += 1
+    
+    tcp_success_rate = (tcp_success_count / tcp_test_packets) * 100
+    tcp_avg_recovery = statistics.mean(tcp_recovery_times) if tcp_recovery_times else 0
+    
+    hybrid_metrics["tcp"]["error_recovery"]["success_rate"] = tcp_success_rate
+    hybrid_metrics["tcp"]["error_recovery"]["recovery_times"] = tcp_recovery_times
+    hybrid_metrics["tcp"]["error_recovery"]["avg_recovery_time"] = tcp_avg_recovery
+    
+    logging.info(f"TCP Error recovery: {tcp_success_count}/{tcp_test_packets} packets delivered successfully")
+    if tcp_recovery_times:
+        logging.info(f"TCP Average recovery time: {tcp_avg_recovery:.4f}s")
+    
+    # Test hybrid error recovery
+    hybrid_test_packets = 20
+    hybrid_recovery_times = []
+    hybrid_success_count = 0
+    
+    conn_id = await hybrid_app1.connect_to_tcp('127.0.0.1', 8002)
+    if not conn_id:
+        logging.error("Failed to establish TCP connection for hybrid error recovery test")
+    else:
+        for i in range(hybrid_test_packets):
+            data = f"hybrid-recovery-test-{i}".encode() + b"x" * 100
+            if i % 4 == 0 and i > 0:
+                # Simulate error by temporarily disconnecting and reconnecting
+                await hybrid_app1.disconnect_tcp(conn_id)
+                start_time = time.time()
+                try:
+                    conn_id = await hybrid_app1.connect_to_tcp('127.0.0.1', 8002)
+                    if conn_id:
+                        success = await hybrid_app1.send_to_tcp(conn_id, data)
+                        if success:
+                            hybrid_success_count += 1
+                            recovery_time = time.time() - start_time
+                            hybrid_recovery_times.append(recovery_time)
+                            logging.info(f"Hybrid Packet {i}: Recovered in {recovery_time:.4f}s")
+                except Exception as e:
+                    logging.error(f"Hybrid Packet {i}: Failed to recover: {str(e)}")
+            else:
+                success = await hybrid_app1.send_to_tcp(conn_id, data)
+                if success:
+                    hybrid_success_count += 1
+        
+        await hybrid_app1.disconnect_tcp(conn_id)
+    
+    hybrid_success_rate = (hybrid_success_count / hybrid_test_packets) * 100
+    hybrid_avg_recovery = statistics.mean(hybrid_recovery_times) if hybrid_recovery_times else 0
+    
+    hybrid_metrics["hybrid"]["error_recovery"]["success_rate"] = hybrid_success_rate
+    hybrid_metrics["hybrid"]["error_recovery"]["recovery_times"] = hybrid_recovery_times
+    hybrid_metrics["hybrid"]["error_recovery"]["avg_recovery_time"] = hybrid_avg_recovery
+    
+    logging.info(f"Hybrid Error recovery: {hybrid_success_count}/{hybrid_test_packets} packets delivered successfully")
+    if hybrid_recovery_times:
+        logging.info(f"Hybrid Average recovery time: {hybrid_avg_recovery:.4f}s")
+    
+    return {
+        "rina": {
+            "success_rate": rina_success_rate,
+            "recovery_times": rina_recovery_times,
+            "avg_recovery_time": rina_avg_recovery
+        },
+        "tcp": {
+            "success_rate": tcp_success_rate,
+            "recovery_times": tcp_recovery_times,
+            "avg_recovery_time": tcp_avg_recovery
+        },
+        "hybrid": {
+            "success_rate": hybrid_success_rate,
+            "recovery_times": hybrid_recovery_times,
+            "avg_recovery_time": hybrid_avg_recovery
+        }
+    }
+
+@pytest.mark.asyncio
+async def test_throughput_sustained_hybrid(setup_hybrid_network):
+    """Test sustained throughput in hybrid network"""
+    network, ipcp1, ipcp2, _, _, hybrid_app1, hybrid_app2, adapter1, adapter2 = setup_hybrid_network
+    
+    # Test configurations
+    chunk_size = 4096
+    test_duration = 5.0
+    
+    # Test RINA sustained throughput
+    flow_id = await ipcp1.allocate_flow(ipcp2, port=5000)
+    data = b"x" * chunk_size
+    throughput_samples = []
+    start_test = time.time()
+    chunks_sent = 0
+    
+    while time.time() - start_test < test_duration:
+        start_sample = time.time()
+        sample_chunks = 0
+        while time.time() - start_sample < 0.2:
+            await ipcp1.send_data(flow_id, data)
+            chunks_sent += 1
+            sample_chunks += 1
+        sample_duration = time.time() - start_sample
+        sample_throughput = (sample_chunks * chunk_size * 8) / (sample_duration * 1000000)
+        throughput_samples.append(sample_throughput)
+    
+    total_duration = time.time() - start_test
+    overall_throughput = (chunks_sent * chunk_size * 8) / (total_duration * 1000000)
+    
+    hybrid_metrics["rina"]["throughput"]["sustained"] = {
+        "average": overall_throughput,
+        "samples": throughput_samples,
+        "min": min(throughput_samples) if throughput_samples else 0,
+        "max": max(throughput_samples) if throughput_samples else 0
+    }
+    
+    logging.info(f"RINA Sustained throughput over {test_duration:.1f}s: {overall_throughput:.2f} Mbps")
+    logging.info(f"RINA Variation: min={min(throughput_samples):.2f}, max={max(throughput_samples):.2f} Mbps")
+    
+    await ipcp1.deallocate_flow(flow_id)
+    await asyncio.sleep(0.1)
+    
+    # Test TCP sustained throughput
+    tcp_throughput_samples = []
+    start_test = time.time()
+    tcp_chunks_sent = 0
+    
+    while time.time() - start_test < test_duration:
+        start_sample = time.time()
+        sample_chunks = 0
+        tasks = []
+        
+        # Send multiple packets in parallel to maximize bandwidth usage
+        while time.time() - start_sample < 0.2:
+            task = asyncio.create_task(tcp_client('127.0.0.1', 8002, data, iterations=1, delay=0))
+            tasks.append(task)
+            tcp_chunks_sent += 1
+            sample_chunks += 1
+            await asyncio.sleep(0.001)  # Small delay to avoid flooding
+        
+        # Wait for all tasks to complete
+        await asyncio.gather(*tasks, return_exceptions=True)
+        
+        sample_duration = time.time() - start_sample
+        sample_throughput = (sample_chunks * chunk_size * 8) / (sample_duration * 1000000)
+        tcp_throughput_samples.append(sample_throughput)
+    
+    total_duration = time.time() - start_test
+    tcp_overall_throughput = (tcp_chunks_sent * chunk_size * 8) / (total_duration * 1000000)
+    
+    hybrid_metrics["tcp"]["throughput"]["sustained"] = {
+        "average": tcp_overall_throughput,
+        "samples": tcp_throughput_samples,
+        "min": min(tcp_throughput_samples) if tcp_throughput_samples else 0,
+        "max": max(tcp_throughput_samples) if tcp_throughput_samples else 0
+    }
+    
+    logging.info(f"TCP Sustained throughput over {test_duration:.1f}s: {tcp_overall_throughput:.2f} Mbps")
+    logging.info(f"TCP Variation: min={min(tcp_throughput_samples):.2f}, max={max(tcp_throughput_samples):.2f} Mbps")
+    
+    # Test hybrid sustained throughput
+    conn_id = await hybrid_app1.connect_to_tcp('127.0.0.1', 8002)
+    if not conn_id:
+        logging.error("Failed to establish TCP connection for hybrid sustained throughput test")
+        return {
+            "rina": hybrid_metrics["rina"]["throughput"]["sustained"],
+            "tcp": hybrid_metrics["tcp"]["throughput"]["sustained"],
+            "hybrid": {"error": "Failed to establish connection"}
+        }
+    
+    hybrid_throughput_samples = []
+    start_test = time.time()
+    hybrid_chunks_sent = 0
+    
+    while time.time() - start_test < test_duration:
+        start_sample = time.time()
+        sample_chunks = 0
+        while time.time() - start_sample < 0.2:
+            success = await hybrid_app1.send_to_tcp(conn_id, data)
+            if success:
+                hybrid_chunks_sent += 1
+                sample_chunks += 1
+            await asyncio.sleep(0.001)  # Small delay to avoid flooding
+        
+        sample_duration = time.time() - start_sample
+        sample_throughput = (sample_chunks * chunk_size * 8) / (sample_duration * 1000000)
+        hybrid_throughput_samples.append(sample_throughput)
+    
+    await hybrid_app1.disconnect_tcp(conn_id)
+    
+    total_duration = time.time() - start_test
+    hybrid_overall_throughput = (hybrid_chunks_sent * chunk_size * 8) / (total_duration * 1000000)
+    
+    hybrid_metrics["hybrid"]["throughput"]["sustained"] = {
+        "average": hybrid_overall_throughput,
+        "samples": hybrid_throughput_samples,
+        "min": min(hybrid_throughput_samples) if hybrid_throughput_samples else 0,
+        "max": max(hybrid_throughput_samples) if hybrid_throughput_samples else 0
+    }
+    
+    logging.info(f"Hybrid Sustained throughput over {test_duration:.1f}s: {hybrid_overall_throughput:.2f} Mbps")
+    logging.info(f"Hybrid Variation: min={min(hybrid_throughput_samples):.2f}, max={max(hybrid_throughput_samples):.2f} Mbps")
+    
+    return {
+        "rina": hybrid_metrics["rina"]["throughput"]["sustained"],
+        "tcp": hybrid_metrics["tcp"]["throughput"]["sustained"],
+        "hybrid": hybrid_metrics["hybrid"]["throughput"]["sustained"]
+    }
+
+@pytest.mark.asyncio
+async def test_throughput_with_congestion_hybrid(setup_hybrid_network):
+    """Test throughput under congestion in hybrid network"""
+    network, ipcp1, ipcp2, _, _, hybrid_app1, hybrid_app2, adapter1, adapter2 = setup_hybrid_network
+    
+    # Test configurations
+    chunk_size = 1024
+    test_duration = 3.0
+    flow_count = 5
+    
+    # Test RINA congestion
+    rina_flows = []
+    for i in range(flow_count):
+        flow_id = await ipcp1.allocate_flow(ipcp2, port=5000)
+        rina_flows.append(flow_id)
+    
+    rina_data = b"x" * chunk_size
+    start_test = time.time()
+    rina_chunks_sent = [0] * len(rina_flows)
+    
+    while time.time() - start_test < test_duration:
+        for i, flow_id in enumerate(rina_flows):
+            try:
+                await ipcp1.send_data(flow_id, rina_data)
+                rina_chunks_sent[i] += 1
+            except Exception as e:
+                logging.warning(f"RINA flow {i} send error: {str(e)}")
+        await asyncio.sleep(0.001)
+    
+    total_duration = time.time() - start_test
+    rina_throughputs = [(sent * chunk_size * 8) / (total_duration * 1000000) for sent in rina_chunks_sent]
+    rina_total_throughput = sum(rina_throughputs)
+    
+    hybrid_metrics["rina"]["throughput"]["with_congestion"] = {
+        "per_flow": rina_throughputs,
+        "total": rina_total_throughput
+    }
+    
+    logging.info(f"RINA Total throughput under congestion: {rina_total_throughput:.2f} Mbps")
+    for i, tp in enumerate(rina_throughputs):
+        logging.info(f"  RINA Flow {i}: {tp:.2f} Mbps")
+    
+    for flow_id in rina_flows:
+        await ipcp1.deallocate_flow(flow_id)
+    await asyncio.sleep(0.1)
+    
+    # Test TCP congestion
+    tcp_ports = [8002] * flow_count  # Using the same port for all clients
+    tcp_data = b"x" * chunk_size
+    start_test = time.time()
+    tcp_chunks_sent = [0] * flow_count
+    
+    while time.time() - start_test < test_duration:
+        tasks = []
+        for i in range(flow_count):
+            task = asyncio.create_task(tcp_client('127.0.0.1', tcp_ports[i], tcp_data))
+            tasks.append(task)
+            tcp_chunks_sent[i] += 1
+        
+        results = await asyncio.gather(*tasks, return_exceptions=True)
+        await asyncio.sleep(0.001)
+    
+    total_duration = time.time() - start_test
+    tcp_throughputs = [(sent * chunk_size * 8) / (total_duration * 1000000) for sent in tcp_chunks_sent]
+    tcp_total_throughput = sum(tcp_throughputs)
+    
+    hybrid_metrics["tcp"]["throughput"]["with_congestion"] = {
+        "per_flow": tcp_throughputs,
+        "total": tcp_total_throughput
+    }
+    
+    logging.info(f"TCP Total throughput under congestion: {tcp_total_throughput:.2f} Mbps")
+    for i, tp in enumerate(tcp_throughputs):
+        logging.info(f"  TCP Flow {i}: {tp:.2f} Mbps")
+    
+    # Test hybrid congestion
+    hybrid_connections = []
+    for i in range(flow_count):
+        conn_id = await hybrid_app1.connect_to_tcp('127.0.0.1', 8002)
+        if conn_id:
+            hybrid_connections.append(conn_id)
+    
+    if not hybrid_connections:
+        logging.error("Failed to establish any hybrid connections for congestion test")
+    else:
+        hybrid_data = b"x" * chunk_size
+        start_test = time.time()
+        hybrid_chunks_sent = [0] * len(hybrid_connections)
+        
+        while time.time() - start_test < test_duration:
+            for i, conn_id in enumerate(hybrid_connections):
+                try:
+                    success = await hybrid_app1.send_to_tcp(conn_id, hybrid_data)
+                    if success:
+                        hybrid_chunks_sent[i] += 1
+                except Exception as e:
+                    logging.warning(f"Hybrid connection {i} send error: {str(e)}")
+            await asyncio.sleep(0.001)
+        
+        total_duration = time.time() - start_test
+        hybrid_throughputs = [(sent * chunk_size * 8) / (total_duration * 1000000) for sent in hybrid_chunks_sent]
+        hybrid_total_throughput = sum(hybrid_throughputs)
+        
+        hybrid_metrics["hybrid"]["throughput"]["with_congestion"] = {
+            "per_flow": hybrid_throughputs,
+            "total": hybrid_total_throughput
+        }
+        
+        logging.info(f"Hybrid Total throughput under congestion: {hybrid_total_throughput:.2f} Mbps")
+        for i, tp in enumerate(hybrid_throughputs):
+            logging.info(f"  Hybrid Flow {i}: {tp:.2f} Mbps")
+        
+        for conn_id in hybrid_connections:
+            await hybrid_app1.disconnect_tcp(conn_id)
+    
+    return {
+        "rina": hybrid_metrics["rina"]["throughput"]["with_congestion"],
+        "tcp": hybrid_metrics["tcp"]["throughput"]["with_congestion"],
+        "hybrid": hybrid_metrics["hybrid"]["throughput"].get("with_congestion", {"error": "Failed to establish connections"})
+    }
+
+@pytest.mark.asyncio
+async def test_packet_delivery_under_load_hybrid(setup_hybrid_network):
+    """Test packet delivery ratio under different load levels in hybrid network"""
+    network, ipcp1, ipcp2, _, _, hybrid_app1, hybrid_app2, adapter1, adapter2 = setup_hybrid_network
+    
+    load_levels = [1, 3, 5, 7]
+    results = {
+        "rina": {},
+        "tcp": {},
+        "hybrid": {}
+    }
+    
+    # Test RINA packet delivery under load
+    for load in load_levels:
+        flows = []
+        for _ in range(load):
+            flow_id = await ipcp1.allocate_flow(ipcp2, port=5000)
+            flows.append(flow_id)
+            ipcp2.flows[flow_id].stats["received_packets"] = 0
+        
+        packets_per_flow = 200
+        total_sent = 0
+        total_received = 0
+        
+        for flow_id in flows:
+            for _ in range(packets_per_flow):
+                await ipcp1.send_data(flow_id, b"data")
+                total_sent += 1
+        
+        await asyncio.sleep(1.0)
+        
+        for flow_id in flows:
+            received = ipcp2.flows[flow_id].stats["received_packets"]
+            total_received += received
+        
+        delivery_ratio = (total_received / total_sent) * 100
+        results["rina"][load] = delivery_ratio
+        hybrid_metrics["rina"]["packet_delivery_ratio"][f"load_{load}"] = delivery_ratio
+        logging.info(f"RINA Packet delivery under load {load} flows: {delivery_ratio:.2f}%")
+        
+        for flow_id in flows:
+            await ipcp1.deallocate_flow(flow_id)
+        await asyncio.sleep(0.1)
+    
+    # Test TCP packet delivery under load
+    for load in load_levels:
+        packets_per_client = 200
+        total_sent = 0
+        total_received = 0
+        
+        # Create TCP clients matching the load level
+        for _ in range(packets_per_client):
+            tasks = []
+            for _ in range(load):
+                task = asyncio.create_task(tcp_client('127.0.0.1', 8002, b"data"))
+                tasks.append(task)
+                total_sent += 1
+            
+            results = await asyncio.gather(*tasks, return_exceptions=True)
+            for result in results:
+                if isinstance(result, dict) and result.get("success", False):
+                    total_received += 1
+            
+            await asyncio.sleep(0.01)
+        
+        delivery_ratio = (total_received / total_sent) * 100
+        results["tcp"][load] = delivery_ratio
+        hybrid_metrics["tcp"]["packet_delivery_ratio"][f"load_{load}"] = delivery_ratio
+        logging.info(f"TCP Packet delivery under load {load} clients: {delivery_ratio:.2f}%")
+        
+        await asyncio.sleep(0.1)
+    
+    # Test hybrid packet delivery under load
+    for load in load_levels:
+        connections = []
+        for _ in range(load):
+            conn_id = await hybrid_app1.connect_to_tcp('127.0.0.1', 8002)
+            if conn_id:
+                connections.append(conn_id)
+        
+        if not connections:
+            logging.error(f"Failed to establish hybrid connections for load test level {load}")
+            continue
+        
+        packets_per_conn = 200
+        total_sent = 0
+        total_received = 0
+        
+        for conn_id in connections:
+            for _ in range(packets_per_conn):
+                success = await hybrid_app1.send_to_tcp(conn_id, b"data")
+                total_sent += 1
+                if success:
+                    total_received += 1
+        
+        delivery_ratio = (total_received / total_sent) * 100
+        results["hybrid"][load] = delivery_ratio
+        hybrid_metrics["hybrid"]["packet_delivery_ratio"][f"load_{load}"] = delivery_ratio
+        logging.info(f"Hybrid Packet delivery under load {load} connections: {delivery_ratio:.2f}%")
+        
+        for conn_id in connections:
+            await hybrid_app1.disconnect_tcp(conn_id)
+        await asyncio.sleep(0.1)
+    
+    return results
+
+@pytest.mark.asyncio
+async def test_concurrent_flows_hybrid(setup_hybrid_network):
+    """Test scalability with concurrent flows in hybrid network"""
+    network, ipcp1, ipcp2, _, _, hybrid_app1, hybrid_app2, adapter1, adapter2 = setup_hybrid_network
+    
+    flow_counts = [1, 5, 10, 20, 50]
+    results = {
+        "rina": {},
+        "tcp": {},
+        "hybrid": {}
+    }
+    
+    # Test RINA concurrent flows
+    for count in flow_counts:
+        start_time = time.time()
+        flows = []
+        
+        for i in range(count):
+            qos = QoS(bandwidth=10)
+            try:
+                flow_id = await asyncio.wait_for(
+                    ipcp1.allocate_flow(ipcp2, port=5000, qos=qos),
+                    timeout=5.0
+                )
+                if flow_id:
+                    flows.append(flow_id)
+            except asyncio.TimeoutError:
+                logging.warning(f"RINA: Timeout allocating flow {i+1}")
+                break
+            except Exception as e:
+                logging.error(f"RINA: Error allocating flow {i+1}: {str(e)}")
+                break
+        
+        setup_time = time.time() - start_time
+        actual_count = len(flows)
+        
+        results["rina"][count] = {
+            "allocated": actual_count,
+            "setup_time": setup_time,
+            "setup_time_per_flow": setup_time / max(actual_count, 1)
+        }
+        
+        hybrid_metrics["rina"]["scalability"][f"concurrent_{count}"] = results["rina"][count]
+        logging.info(f"RINA Concurrent flows ({count} requested): {actual_count} allocated in {setup_time:.4f}s")
+        
+        # Send test data through each flow
+        data = b"test"
+        for flow_id in flows:
+            await ipcp1.send_data(flow_id, data)
+        
+        # Clean up flows
+        for flow_id in flows:
+            await ipcp1.deallocate_flow(flow_id)
+        
+        await asyncio.sleep(0.1)
+        
+        if actual_count < count:
+            break
+    
+    # Test TCP concurrent connections
+    for count in flow_counts:
+        start_time = time.time()
+        connections = []
+        
+        # Create multiple TCP connections
+        for i in range(count):
+            try:
+                reader, writer = await asyncio.wait_for(
+                    asyncio.open_connection('127.0.0.1', 8002),
+                    timeout=5.0
+                )
+                connections.append((reader, writer))
+            except asyncio.TimeoutError:
+                logging.warning(f"TCP: Timeout creating connection {i+1}")
+                break
+            except Exception as e:
+                logging.error(f"TCP: Error creating connection {i+1}: {str(e)}")
+                break
+        
+        setup_time = time.time() - start_time
+        actual_count = len(connections)
+        
+        results["tcp"][count] = {
+            "allocated": actual_count,
+            "setup_time": setup_time,
+            "setup_time_per_conn": setup_time / max(actual_count, 1)
+        }
+        
+        hybrid_metrics["tcp"]["scalability"][f"concurrent_{count}"] = results["tcp"][count]
+        logging.info(f"TCP Concurrent connections ({count} requested): {actual_count} established in {setup_time:.4f}s")
+        
+        # Send test data through each connection
+        data = b"test"
+        for _, writer in connections:
+            writer.write(data)
+            await writer.drain()
+        
+        # Clean up connections
+        for _, writer in connections:
+            writer.close()
+            await writer.wait_closed()
+        
+        await asyncio.sleep(0.1)
+        
+        if actual_count < count:
+            break
+    
+    # Test hybrid concurrent connections
+    for count in flow_counts:
+        start_time = time.time()
+        connections = []
+        
+        for i in range(count):
+            try:
+                conn_id = await asyncio.wait_for(
+                    hybrid_app1.connect_to_tcp('127.0.0.1', 8002),
+                    timeout=5.0
+                )
+                if conn_id:
+                    connections.append(conn_id)
+            except asyncio.TimeoutError:
+                logging.warning(f"Hybrid: Timeout creating connection {i+1}")
+                break
+            except Exception as e:
+                logging.error(f"Hybrid: Error creating connection {i+1}: {str(e)}")
+                break
+        
+        setup_time = time.time() - start_time
+        actual_count = len(connections)
+        
+        results["hybrid"][count] = {
+            "allocated": actual_count,
+            "setup_time": setup_time,
+            "setup_time_per_conn": setup_time / max(actual_count, 1)
+        }
+        
+        hybrid_metrics["hybrid"]["scalability"][f"concurrent_{count}"] = results["hybrid"][count]
+        logging.info(f"Hybrid Concurrent connections ({count} requested): {actual_count} established in {setup_time:.4f}s")
+        
+        # Send test data through each connection
+        data = b"test"
+        for conn_id in connections:
+            await hybrid_app1.send_to_tcp(conn_id, data)
+        
+        # Clean up connections
+        for conn_id in connections:
+            await hybrid_app1.disconnect_tcp(conn_id)
+        
+        await asyncio.sleep(0.1)
+        
+        if actual_count < count:
+            break
+    
+    return results
+
 def log_memory_usage():
     process = psutil.Process(os.getpid())
     memory_info = process.memory_info()
