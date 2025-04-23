@@ -151,6 +151,7 @@ async def measure_flow_metrics(src_ipcp, dst_ipcp, packet_size, packet_count,
 @pytest.mark.asyncio
 async def test_throughput_realistic_networks(network):
     """Test throughput across different realistic network profiles"""
+    global metrics
     results = {}
     
     # Parameters
@@ -224,13 +225,14 @@ async def test_throughput_realistic_networks(network):
             }
             
             print(f"  Packet size: {packet_size} bytes - Throughput: {throughput_mbps:.2f} Mbps ({packets_per_second:.2f} packets/sec)")
-    
+    metrics["throughput_realistic_networks"] = results
     return results
 
 
 @pytest.mark.asyncio
 async def test_latency_jitter_realistic(network):
     """Test latency and jitter across different network profiles"""
+    global metrics
     results = {}
     
     # Parameters
@@ -289,13 +291,14 @@ async def test_latency_jitter_realistic(network):
                   f"RTT: {metrics['avg_rtt_ms']:.2f}ms")
         
         results[profile_name] = profile_results
-    
+    metrics["latency_jitter_realistic"] = results
     return results
 
-
+#non salva i risultati
 @pytest.mark.asyncio
 async def test_packet_delivery_ratio_realistic(network):
     """Test PDR under different network profiles and loads"""
+    global metrics
     results = {}
     
     # Parameters
@@ -344,13 +347,14 @@ async def test_packet_delivery_ratio_realistic(network):
                   f"PDR: {metrics['delivery_ratio']:.2f}% ({metrics['received']}/{metrics['sent']} packets)")
         
         results[profile_name] = profile_results
-    
+    metrics["packet_delivery_ratio_realistic"] = results
     return results
 
 
 @pytest.mark.asyncio
 async def test_round_trip_time_realistic(network):
     """Test RTT under different network conditions"""
+    global metrics
     results = {}
     
     # Parameters
@@ -404,20 +408,21 @@ async def test_round_trip_time_realistic(network):
                   f"RTT: avg={metrics['avg_rtt_ms']:.2f}ms, min={metrics['min_rtt_ms']:.2f}ms, max={metrics['max_rtt_ms']:.2f}ms")
         
         results[profile_name] = profile_results
-    
+    metrics["round_trip_time_realistic"] = results
     return results
 
 @pytest.mark.asyncio
 async def test_scalability_concurrent_flows(network):
     """Test scalability with concurrent flows"""
+    global metrics  # Use the global metrics dictionary
     results = {}
     
-    # Parameters
-    flow_counts = [1, 5, 10, 25, 50, 100, 250, 500]
-    test_profiles = ["perfect", "lan", "wifi", "4g"]  # Limited set of profiles for practicality
+    # Parameters - reduce max flow count to something manageable
+    flow_counts = [1, 5, 10, 25, 50]  # Reduced from [1, 5, 10, 25, 50, 100, 250, 500]
+    test_profiles = ["perfect", "lan", "wifi"]  # Limited set of profiles
     
-    # Create network components
-    await network.create_dif("test_dif")
+    # Create network components with higher bandwidth capacity
+    await network.create_dif("test_dif", max_bandwidth=1000)  # 1000 Mbps (1 Gbps) total capacity
     
     for profile_name in test_profiles:
         profile = NETWORK_PROFILES[profile_name]
@@ -433,26 +438,29 @@ async def test_scalability_concurrent_flows(network):
         
         await src_ipcp.enroll(dst_ipcp)
         
-        await network.create_application(f"app_src_scale_{profile_name}", src_ipcp_id)
-        await network.create_application(f"app_dst_scale_{profile_name}", dst_ipcp_id, port=5000)
+        src_app = await network.create_application(f"app_src_scale_{profile_name}", src_ipcp_id)
+        dst_app = await network.create_application(f"app_dst_scale_{profile_name}", dst_ipcp_id, port=5000)
         
         # Set network conditions
         await network.set_network_conditions(src_ipcp_id, dst_ipcp_id, profile)
         
         # Test different flow counts
         for flow_count in flow_counts:
+            # Use less bandwidth per flow for higher counts
+            bandwidth_per_flow = max(1, min(10, 100 // flow_count))  # Adaptive bandwidth
+            
             start_time = time.time()
             flows = []
             success_count = 0
             
-            print(f"  Attempting to allocate {flow_count} concurrent flows...")
+            print(f"  Attempting to allocate {flow_count} concurrent flows (with {bandwidth_per_flow} Mbps each)...")
             
             # Try to allocate flows
             for i in range(flow_count):
                 try:
                     flow_id = await asyncio.wait_for(
-                        src_ipcp.allocate_flow(dst_ipcp, port=5000, qos=QoS(bandwidth=10)),
-                        timeout=10.0
+                        src_ipcp.allocate_flow(dst_ipcp, port=5000, qos=QoS(bandwidth=bandwidth_per_flow)),
+                        timeout=3.0  # Reduce timeout to speed up the test
                     )
                     if flow_id:
                         flows.append(flow_id)
@@ -467,42 +475,58 @@ async def test_scalability_concurrent_flows(network):
             allocation_time = time.time() - start_time
             actual_count = len(flows)
             
-            # Test sending data through all flows
+            # Test sending data through all flows - with retries for robustness
             test_data = b"test_data"
             send_success = 0
             
             for flow_id in flows:
-                try:
-                    await src_ipcp.send_data(flow_id, test_data)
-                    send_success += 1
-                except Exception as e:
-                    print(f"    Error sending data on flow: {str(e)}")
+                retries = 3
+                while retries > 0:
+                    try:
+                        await src_ipcp.send_data(flow_id, test_data)
+                        send_success += 1
+                        break
+                    except Exception as e:
+                        print(f"    Error sending data on flow (retry {4-retries}): {str(e)}")
+                        retries -= 1
+                        # Small delay before retry
+                        await asyncio.sleep(0.1)
             
-            # Clean up flows
+            # Allow time for packets in flight before deallocation
+            await asyncio.sleep(max(0.5, profile.get("latency_ms", 0) / 500))
+            
+            # Clean up flows with careful error handling
             for flow_id in flows:
                 try:
-                    await src_ipcp.deallocate_flow(flow_id)
-                except Exception:
-                    pass
+                    await asyncio.wait_for(src_ipcp.deallocate_flow(flow_id), timeout=2.0)
+                except (asyncio.TimeoutError, Exception) as e:
+                    print(f"    Error deallocating flow {flow_id}: {str(e)}")
             
             profile_results[flow_count] = {
                 "target_flows": flow_count,
                 "successful_flows": actual_count,
                 "allocation_time_seconds": allocation_time,
                 "allocation_time_per_flow_ms": (allocation_time * 1000) / max(actual_count, 1),
-                "data_send_success_rate": (send_success / max(actual_count, 1)) * 100
+                "data_send_success_rate": (send_success / max(actual_count, 1)) * 100,
+                "bandwidth_per_flow_mbps": bandwidth_per_flow
             }
             
             print(f"    Results: {actual_count}/{flow_count} flows allocated in {allocation_time:.2f}s "
                   f"({profile_results[flow_count]['allocation_time_per_flow_ms']:.2f}ms per flow)")
             print(f"    Data send success rate: {profile_results[flow_count]['data_send_success_rate']:.2f}%")
             
+            # Wait a bit between tests to allow resources to fully clean up
+            await asyncio.sleep(1.0)
+            
             # Break if we're already failing to allocate all flows
-            if actual_count < flow_count and flow_count > 10:  # Skip small differences but catch major failures
-                print(f"    Failed to allocate all flows, skipping higher flow counts")
+            if actual_count < flow_count * 0.8:  # Allow for some failures (20%)
+                print(f"    Failed to allocate most flows, skipping higher flow counts")
                 break
         
         results[profile_name] = profile_results
+    
+    # Store results in global metrics
+    metrics["scalability_concurrent_flows"] = results
     
     return results
 

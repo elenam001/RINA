@@ -114,8 +114,10 @@ class NetworkConditions:
                 else:
                     await dest_ipcp.receive_data(packet, flow_id)
             else:
-                print(f"Flow {flow_id} not found in destination IPCP {dest_ipcp.id}")
+                # Silently drop packet instead of printing error (this is expected in network conditions)
+                pass
         except Exception as e:
+            # Log the error but don't crash
             print(f"Error delivering packet: {str(e)}")
 
 
