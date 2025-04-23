@@ -6,13 +6,8 @@ import statistics
 import json
 import random
 from contextlib import AsyncExitStack
-from RINA.network_conditions import RealisticNetwork
-from rina.dif import DIF
-from rina.ipcp import IPCP
-from rina.application import Application
 from rina.qos import QoS
-from rina.flow import FlowAllocationFSM
-
+from network_conditions import RealisticNetwork
 
 @pytest_asyncio.fixture
 async def network():
@@ -21,8 +16,6 @@ async def network():
     yield network
     await network.cleanup()
 
-
-# Define realistic network condition profiles
 NETWORK_PROFILES = {
     "perfect": {
         "latency_ms": 0,
@@ -414,7 +407,6 @@ async def test_round_trip_time_realistic(network):
     
     return results
 
-'''
 @pytest.mark.asyncio
 async def test_scalability_concurrent_flows(network):
     """Test scalability with concurrent flows"""
@@ -506,8 +498,15 @@ async def test_scalability_concurrent_flows(network):
             print(f"    Data send success rate: {profile_results[flow_count]['data_send_success_rate']:.2f}%")
             
             # Break if we're already failing to allocate all flows
-            if actual_count < flow
-'''
+            if actual_count < flow_count and flow_count > 10:  # Skip small differences but catch major failures
+                print(f"    Failed to allocate all flows, skipping higher flow counts")
+                break
+        
+        results[profile_name] = profile_results
+    
+    return results
+
+metrics = {}
 
 @pytest.fixture(scope="session", autouse=True)
 def save_metrics():

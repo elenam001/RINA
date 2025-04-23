@@ -2,9 +2,9 @@ import asyncio
 import random
 import time
 
-from RINA.rina.application import Application
-from RINA.rina.dif import DIF
-from RINA.rina.ipcp import IPCP
+from rina.application import Application
+from rina.dif import DIF
+from rina.ipcp import IPCP
 
 
 class NetworkConditions:
@@ -101,9 +101,11 @@ class NetworkConditions:
         """Deliver a packet after the specified delay"""
         await asyncio.sleep(delay)
         try:
-            # Finally deliver the packet
-            if flow_id in dest_ipcp.flows:
+            # Check if the flow exists before delivering
+            if hasattr(dest_ipcp, 'flows') and flow_id in dest_ipcp.flows:
                 await dest_ipcp.receive_data(flow_id, packet)
+            else:
+                print(f"Flow {flow_id} not found in destination IPCP {dest_ipcp.ipcp_id}")
         except Exception as e:
             print(f"Error delivering packet: {str(e)}")
 
@@ -157,13 +159,19 @@ class RealisticNetwork:
         
         # Replace send_data with our interceptor
         async def intercepted_send_data(flow_id, data):
-            if flow_id in src_ipcp.flows and src_ipcp.flows[flow_id].destination == self.ipcps[dst_ipcp_id]:
-                dst_ipcp = self.ipcps[dst_ipcp_id]
-                await net_cond.process_packet(data, dst_ipcp, flow_id)
-                return True
+            if flow_id in src_ipcp.flows:
+                flow = src_ipcp.flows[flow_id]
+                dst_ipcp = flow.dest_ipcp
+                
+                if dst_ipcp == self.ipcps[dst_ipcp_id]:
+                    await net_cond.process_packet(data, dst_ipcp, flow_id)
+                    return True
+                else:
+                    # Use the original method for other flows
+                    return await original_send_data(flow_id, data)
             else:
-                # Use the original method for other flows
-                return await original_send_data(flow_id, data)
+                print(f"Flow {flow_id} not found in source IPCP {src_ipcp_id}")
+                return False
                 
         src_ipcp.send_data = intercepted_send_data
         # Store for cleanup
