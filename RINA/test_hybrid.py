@@ -133,6 +133,9 @@ async def test_hybrid_basic_connectivity(hybrid_net):
     dif = await hybrid_net.create_rina_dif("test_dif", layer=0)
     src_ipcp = await hybrid_net.create_rina_ipcp("src_ipcp", "test_dif")
     dst_ipcp = await hybrid_net.create_rina_ipcp("dst_ipcp", "test_dif")
+
+    realistic_network.ipcps["src_ipcp"] = src_ipcp
+    realistic_network.ipcps["dst_ipcp"] = dst_ipcp
     
     # Enroll IPCPs
     await src_ipcp.enroll(dst_ipcp)
@@ -195,6 +198,9 @@ async def test_throughput_hybrid_network(hybrid_net, realistic_network):
             
             src_ipcp = await hybrid_net.create_rina_ipcp(src_ipcp_id, "test_dif")
             dst_ipcp = await hybrid_net.create_rina_ipcp(dst_ipcp_id, "test_dif")
+
+            realistic_network.ipcps[src_ipcp_id] = src_ipcp
+            realistic_network.ipcps[dst_ipcp_id] = dst_ipcp
             
             await src_ipcp.enroll(dst_ipcp)
             
@@ -312,6 +318,8 @@ async def test_latency_jitter_hybrid(hybrid_net, realistic_network):
             src_ipcp = await hybrid_net.create_rina_ipcp(src_ipcp_id, "test_dif")
             dst_ipcp = await hybrid_net.create_rina_ipcp(dst_ipcp_id, "test_dif")
             
+            realistic_network.ipcps[src_ipcp_id] = src_ipcp
+            realistic_network.ipcps[dst_ipcp_id] = dst_ipcp
             await src_ipcp.enroll(dst_ipcp)
             
             # Create TCP adapter
@@ -385,6 +393,10 @@ async def test_packet_delivery_ratio_hybrid(hybrid_net, realistic_network):
             
             src_ipcp = await hybrid_net.create_rina_ipcp(src_ipcp_id, "test_dif")
             dst_ipcp = await hybrid_net.create_rina_ipcp(dst_ipcp_id, "test_dif")
+
+            realistic_network.ipcps[src_ipcp_id] = src_ipcp
+            realistic_network.ipcps[dst_ipcp_id] = dst_ipcp
+            
             
             await src_ipcp.enroll(dst_ipcp)
             
@@ -441,6 +453,10 @@ async def test_concurrent_tcp_connections(hybrid_net):
     dif = await hybrid_net.create_rina_dif("test_dif", layer=0)
     src_ipcp = await hybrid_net.create_rina_ipcp("src_ipcp", "test_dif")
     dst_ipcp = await hybrid_net.create_rina_ipcp("dst_ipcp", "test_dif")
+
+    realistic_network.ipcps["src_ipcp"] = src_ipcp
+    realistic_network.ipcps["dst_ipcp"] = dst_ipcp
+            
     
     await src_ipcp.enroll(dst_ipcp)
     
@@ -516,6 +532,10 @@ async def test_bidirectional_communication(hybrid_net):
     dif = await hybrid_net.create_rina_dif("test_dif", layer=0)
     src_ipcp = await hybrid_net.create_rina_ipcp("src_ipcp", "test_dif")
     dst_ipcp = await hybrid_net.create_rina_ipcp("dst_ipcp", "test_dif")
+
+    realistic_network.ipcps["src_ipcp"] = src_ipcp
+    realistic_network.ipcps["dst_ipcp"] = dst_ipcp
+            
     
     await src_ipcp.enroll(dst_ipcp)
     
@@ -596,6 +616,10 @@ async def test_tcp_reconnection_resilience(hybrid_net):
     dif = await hybrid_net.create_rina_dif("test_dif", layer=0)
     src_ipcp = await hybrid_net.create_rina_ipcp("src_ipcp", "test_dif")
     dst_ipcp = await hybrid_net.create_rina_ipcp("dst_ipcp", "test_dif")
+
+    realistic_network.ipcps[src_ipcp] = src_ipcp
+    realistic_network.ipcps[dst_ipcp] = dst_ipcp
+            
     
     await src_ipcp.enroll(dst_ipcp)
     
