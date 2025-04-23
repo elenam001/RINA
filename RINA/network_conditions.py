@@ -103,9 +103,18 @@ class NetworkConditions:
         try:
             # Check if the flow exists before delivering
             if hasattr(dest_ipcp, 'flows') and flow_id in dest_ipcp.flows:
-                await dest_ipcp.receive_data(flow_id, packet)
+                # Make sure the packet is properly formatted if it's not already a dict
+                if not isinstance(packet, dict) and isinstance(packet, bytes):
+                    formatted_packet = {
+                        "seq_num": dest_ipcp.flows[flow_id].recv_base,
+                        "is_ack": False,
+                        "data": packet
+                    }
+                    await dest_ipcp.receive_data(formatted_packet, flow_id)
+                else:
+                    await dest_ipcp.receive_data(packet, flow_id)
             else:
-                print(f"Flow {flow_id} not found in destination IPCP {dest_ipcp.ipcp_id}")
+                print(f"Flow {flow_id} not found in destination IPCP {dest_ipcp.id}")
         except Exception as e:
             print(f"Error delivering packet: {str(e)}")
 
