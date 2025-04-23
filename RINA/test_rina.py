@@ -59,6 +59,8 @@ NETWORK_PROFILES = {
     }
 }
 
+# Global metrics dictionary to store all test results
+metrics = {}
 
 async def measure_flow_metrics(src_ipcp, dst_ipcp, packet_size, packet_count, 
                               inter_packet_delay=0.001, flow_qos=None):
@@ -151,7 +153,6 @@ async def measure_flow_metrics(src_ipcp, dst_ipcp, packet_size, packet_count,
 @pytest.mark.asyncio
 async def test_throughput_realistic_networks(network):
     """Test throughput across different realistic network profiles"""
-    global metrics
     results = {}
     
     # Parameters
@@ -225,6 +226,8 @@ async def test_throughput_realistic_networks(network):
             }
             
             print(f"  Packet size: {packet_size} bytes - Throughput: {throughput_mbps:.2f} Mbps ({packets_per_second:.2f} packets/sec)")
+    
+    # Store results in the global metrics dictionary
     metrics["throughput_realistic_networks"] = results
     return results
 
@@ -232,7 +235,6 @@ async def test_throughput_realistic_networks(network):
 @pytest.mark.asyncio
 async def test_latency_jitter_realistic(network):
     """Test latency and jitter across different network profiles"""
-    global metrics
     results = {}
     
     # Parameters
@@ -269,7 +271,7 @@ async def test_latency_jitter_realistic(network):
             await network.set_network_conditions(src_ipcp_id, dst_ipcp_id, profile)
             
             # Measure metrics
-            metrics = await measure_flow_metrics(
+            test_metrics = await measure_flow_metrics(
                 src_ipcp, dst_ipcp,
                 packet_size=packet_size,
                 packet_count=current_samples,
@@ -277,28 +279,29 @@ async def test_latency_jitter_realistic(network):
             )
             
             profile_results[packet_size] = {
-                "avg_latency_ms": metrics["avg_latency_ms"],
-                "min_latency_ms": metrics["min_latency_ms"],
-                "max_latency_ms": metrics["max_latency_ms"],
-                "avg_jitter_ms": metrics["avg_jitter_ms"],
-                "max_jitter_ms": metrics["max_jitter_ms"],
-                "avg_rtt_ms": metrics["avg_rtt_ms"]
+                "avg_latency_ms": test_metrics["avg_latency_ms"],
+                "min_latency_ms": test_metrics["min_latency_ms"],
+                "max_latency_ms": test_metrics["max_latency_ms"],
+                "avg_jitter_ms": test_metrics["avg_jitter_ms"],
+                "max_jitter_ms": test_metrics["max_jitter_ms"],
+                "avg_rtt_ms": test_metrics["avg_rtt_ms"]
             }
             
             print(f"  Packet size: {packet_size} bytes - "
-                  f"Latency: {metrics['avg_latency_ms']:.2f}ms (min: {metrics['min_latency_ms']:.2f}, max: {metrics['max_latency_ms']:.2f}), "
-                  f"Jitter: {metrics['avg_jitter_ms']:.2f}ms, "
-                  f"RTT: {metrics['avg_rtt_ms']:.2f}ms")
+                  f"Latency: {test_metrics['avg_latency_ms']:.2f}ms (min: {test_metrics['min_latency_ms']:.2f}, max: {test_metrics['max_latency_ms']:.2f}), "
+                  f"Jitter: {test_metrics['avg_jitter_ms']:.2f}ms, "
+                  f"RTT: {test_metrics['avg_rtt_ms']:.2f}ms")
         
         results[profile_name] = profile_results
+    
+    # Store results in the global metrics dictionary
     metrics["latency_jitter_realistic"] = results
     return results
 
-#non salva i risultati
+
 @pytest.mark.asyncio
 async def test_packet_delivery_ratio_realistic(network):
     """Test PDR under different network profiles and loads"""
-    global metrics
     results = {}
     
     # Parameters
@@ -330,7 +333,7 @@ async def test_packet_delivery_ratio_realistic(network):
             await network.set_network_conditions(src_ipcp_id, dst_ipcp_id, profile)
             
             # Measure metrics
-            metrics = await measure_flow_metrics(
+            test_metrics = await measure_flow_metrics(
                 src_ipcp, dst_ipcp,
                 packet_size=packet_size,
                 packet_count=packets_per_test,
@@ -338,15 +341,17 @@ async def test_packet_delivery_ratio_realistic(network):
             )
             
             profile_results[packet_size] = {
-                "sent": metrics["sent"],
-                "received": metrics["received"],
-                "delivery_ratio": metrics["delivery_ratio"]
+                "sent": test_metrics["sent"],
+                "received": test_metrics["received"],
+                "delivery_ratio": test_metrics["delivery_ratio"]
             }
             
             print(f"  Packet size: {packet_size} bytes - "
-                  f"PDR: {metrics['delivery_ratio']:.2f}% ({metrics['received']}/{metrics['sent']} packets)")
+                  f"PDR: {test_metrics['delivery_ratio']:.2f}% ({test_metrics['received']}/{test_metrics['sent']} packets)")
         
         results[profile_name] = profile_results
+    
+    # Store results in the global metrics dictionary
     metrics["packet_delivery_ratio_realistic"] = results
     return results
 
@@ -354,7 +359,6 @@ async def test_packet_delivery_ratio_realistic(network):
 @pytest.mark.asyncio
 async def test_round_trip_time_realistic(network):
     """Test RTT under different network conditions"""
-    global metrics
     results = {}
     
     # Parameters
@@ -391,7 +395,7 @@ async def test_round_trip_time_realistic(network):
             await network.set_network_conditions(src_ipcp_id, dst_ipcp_id, profile)
             
             # Measure metrics with focus on RTT
-            metrics = await measure_flow_metrics(
+            test_metrics = await measure_flow_metrics(
                 src_ipcp, dst_ipcp,
                 packet_size=packet_size,
                 packet_count=current_samples,
@@ -399,22 +403,24 @@ async def test_round_trip_time_realistic(network):
             )
             
             profile_results[packet_size] = {
-                "avg_rtt_ms": metrics["avg_rtt_ms"],
-                "min_rtt_ms": metrics["min_rtt_ms"],
-                "max_rtt_ms": metrics["max_rtt_ms"]
+                "avg_rtt_ms": test_metrics["avg_rtt_ms"],
+                "min_rtt_ms": test_metrics["min_rtt_ms"],
+                "max_rtt_ms": test_metrics["max_rtt_ms"]
             }
             
             print(f"  Packet size: {packet_size} bytes - "
-                  f"RTT: avg={metrics['avg_rtt_ms']:.2f}ms, min={metrics['min_rtt_ms']:.2f}ms, max={metrics['max_rtt_ms']:.2f}ms")
+                  f"RTT: avg={test_metrics['avg_rtt_ms']:.2f}ms, min={test_metrics['min_rtt_ms']:.2f}ms, max={test_metrics['max_rtt_ms']:.2f}ms")
         
         results[profile_name] = profile_results
+    
+    # Store results in the global metrics dictionary
     metrics["round_trip_time_realistic"] = results
     return results
+
 
 @pytest.mark.asyncio
 async def test_scalability_concurrent_flows(network):
     """Test scalability with concurrent flows"""
-    global metrics  # Use the global metrics dictionary
     results = {}
     
     # Parameters - reduce max flow count to something manageable
@@ -511,16 +517,16 @@ async def test_scalability_concurrent_flows(network):
                 "bandwidth_per_flow_mbps": bandwidth_per_flow
             }
             
-            print(f"    Results: {actual_count}/{flow_count} flows allocated in {allocation_time:.2f}s "
+            print(f"Results: {actual_count}/{flow_count} flows allocated in {allocation_time:.2f}s "
                   f"({profile_results[flow_count]['allocation_time_per_flow_ms']:.2f}ms per flow)")
-            print(f"    Data send success rate: {profile_results[flow_count]['data_send_success_rate']:.2f}%")
+            print(f"Data send success rate: {profile_results[flow_count]['data_send_success_rate']:.2f}%")
             
             # Wait a bit between tests to allow resources to fully clean up
             await asyncio.sleep(1.0)
             
             # Break if we're already failing to allocate all flows
             if actual_count < flow_count * 0.8:  # Allow for some failures (20%)
-                print(f"    Failed to allocate most flows, skipping higher flow counts")
+                print(f"Failed to allocate most flows, skipping higher flow counts")
                 break
         
         results[profile_name] = profile_results
@@ -530,7 +536,6 @@ async def test_scalability_concurrent_flows(network):
     
     return results
 
-metrics = {}
 
 @pytest.fixture(scope="session", autouse=True)
 def save_metrics():
