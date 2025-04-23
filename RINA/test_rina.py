@@ -7,59 +7,15 @@ import json
 import random
 from contextlib import AsyncExitStack
 from rina.qos import QoS
-from network_conditions import RealisticNetwork
+import network_conditions
 
 @pytest_asyncio.fixture
 async def network():
     """Create a clean network for each test"""
-    network = RealisticNetwork()
+    network = network_conditions.RealisticNetwork()
     yield network
     await network.cleanup()
 
-NETWORK_PROFILES = {
-    "perfect": {
-        "latency_ms": 0,
-        "jitter_ms": 0, 
-        "packet_loss_rate": 0,
-        "bandwidth_mbps": None,
-        "corruption_rate": 0,
-        "reordering_rate": 0
-    },
-    "lan": {
-        "latency_ms": 2,
-        "jitter_ms": 1,
-        "packet_loss_rate": 0.001,
-        "bandwidth_mbps": 1000,  # 1 Gbps
-        "corruption_rate": 0.0001,
-        "reordering_rate": 0.001
-    },
-    "wifi": {
-        "latency_ms": 5,
-        "jitter_ms": 3,
-        "packet_loss_rate": 0.005,
-        "bandwidth_mbps": 100,  # 100 Mbps
-        "corruption_rate": 0.001,
-        "reordering_rate": 0.002
-    },
-    "4g": {
-        "latency_ms": 50,
-        "jitter_ms": 15,
-        "packet_loss_rate": 0.01,
-        "bandwidth_mbps": 50,  # 50 Mbps
-        "corruption_rate": 0.002,
-        "reordering_rate": 0.005
-    },
-    "congested": {
-        "latency_ms": 100,
-        "jitter_ms": 40,
-        "packet_loss_rate": 0.05,
-        "bandwidth_mbps": 10,  # 10 Mbps
-        "corruption_rate": 0.005,
-        "reordering_rate": 0.01
-    }
-}
-
-# Global metrics dictionary to store all test results
 metrics = {}
 
 async def measure_flow_metrics(src_ipcp, dst_ipcp, packet_size, packet_count, 
@@ -162,7 +118,7 @@ async def test_throughput_realistic_networks(network):
     # Create network components
     await network.create_dif("test_dif")
     
-    for profile_name, profile in NETWORK_PROFILES.items():
+    for profile_name, profile in network_conditions.NETWORK_PROFILES.items():
         print(f"\nTesting throughput on {profile_name} network profile")
         results[profile_name] = {}
         
@@ -244,7 +200,7 @@ async def test_latency_jitter_realistic(network):
     # Create network components
     await network.create_dif("test_dif")
     
-    for profile_name, profile in NETWORK_PROFILES.items():
+    for profile_name, profile in network_conditions.NETWORK_PROFILES.items():
         if profile_name in ["extreme", "satellite"] and samples_per_size > 50:
             # Reduce samples for high latency profiles
             current_samples = 50
@@ -312,7 +268,7 @@ async def test_packet_delivery_ratio_realistic(network):
     await network.create_dif("test_dif")
     
     # Test different network profiles
-    for profile_name, profile in NETWORK_PROFILES.items():
+    for profile_name, profile in network_conditions.NETWORK_PROFILES.items():
         print(f"\nTesting packet delivery ratio on {profile_name} network profile")
         profile_results = {}
         
@@ -368,7 +324,7 @@ async def test_round_trip_time_realistic(network):
     # Create network components
     await network.create_dif("test_dif")
     
-    for profile_name, profile in NETWORK_PROFILES.items():
+    for profile_name, profile in network_conditions.NETWORK_PROFILES.items():
         if profile_name in ["extreme", "satellite"]:
             # Reduce samples for high latency profiles
             current_samples = 20
@@ -431,7 +387,7 @@ async def test_scalability_concurrent_flows(network):
     await network.create_dif("test_dif", max_bandwidth=1000)  # 1000 Mbps (1 Gbps) total capacity
     
     for profile_name in test_profiles:
-        profile = NETWORK_PROFILES[profile_name]
+        profile = network_conditions.NETWORK_PROFILES[profile_name]
         print(f"\nTesting scalability on {profile_name} network profile")
         profile_results = {}
         
