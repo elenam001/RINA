@@ -127,7 +127,7 @@ async def measure_hybrid_flow_metrics(tcp_adapter, tcp_client, packet_size, pack
     return metrics
 
 @pytest.mark.asyncio
-async def test_hybrid_basic_connectivity(hybrid_net):
+async def test_hybrid_basic_connectivity(hybrid_net, realistic_network):
     """Test basic connectivity between TCP/IP and RINA networks"""
     # Create DIFs and IPCPs
     dif = await hybrid_net.create_rina_dif("test_dif", layer=0)
@@ -442,7 +442,7 @@ async def test_packet_delivery_ratio_hybrid(hybrid_net, realistic_network):
     return results
 
 @pytest.mark.asyncio
-async def test_concurrent_tcp_connections(hybrid_net):
+async def test_concurrent_tcp_connections(hybrid_net, realistic_network):
     """Test scalability with concurrent TCP connections"""
     results = {}
     
@@ -526,7 +526,7 @@ async def test_concurrent_tcp_connections(hybrid_net):
     return results
 
 @pytest.mark.asyncio
-async def test_bidirectional_communication(hybrid_net):
+async def test_bidirectional_communication(hybrid_net, realistic_network):
     """Test bidirectional communication between TCP client and RINA application"""
     # Create network components
     dif = await hybrid_net.create_rina_dif("test_dif", layer=0)
@@ -610,7 +610,7 @@ async def test_bidirectional_communication(hybrid_net):
     return results
 
 @pytest.mark.asyncio
-async def test_tcp_reconnection_resilience(hybrid_net):
+async def test_tcp_reconnection_resilience(hybrid_net, realistic_network):
     """Test the ability of the TCP adapter to handle client disconnections and reconnections"""
     # Create network components
     dif = await hybrid_net.create_rina_dif("test_dif", layer=0)
