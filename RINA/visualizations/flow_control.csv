@@ -1,7 +1,0 @@
-metric,value
-sent_packets,100.0
-received_packets,100.0
-ack_packets,100.0
-retransmitted_packets,0.0
-window_efficiency,100.0
-packet_loss_rate,0.0

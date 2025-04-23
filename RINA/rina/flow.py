@@ -215,6 +215,56 @@ class Flow:
         else:
             await self.src_ipcp.receive_data(ack_packet, self.id)
 
+def update_congestion_window(self, ack_received, timeout=False):
+    if not hasattr(self, 'congestion_algorithm') or not hasattr(self, 'congestion_state'):
+        return
+    
+    algo = self.congestion_algorithm
+    state = self.congestion_state
+    
+    if algo == "fixed_window":
+        pass
+        
+    elif algo == "aimd":
+        if timeout:
+            state["ssthresh"] = max(state["cwnd"] // 2, 2)
+            state["cwnd"] = max(1, state["cwnd"] // 2)
+            state["phase"] = "congestion_avoidance"
+        elif ack_received:
+            if state["phase"] == "slow_start":
+                state["cwnd"] += 1
+                if state["cwnd"] >= state["ssthresh"]:
+                    state["phase"] = "congestion_avoidance"
+            else:
+                state["cwnd"] += 1 / state["cwnd"]
+        
+    elif algo == "cubic":
+        if not hasattr(state, "w_max"):
+            state["w_max"] = 0
+            state["k"] = 0
+            state["last_congestion_time"] = time.time()
+            
+        if timeout:
+            state["w_max"] = state["cwnd"]
+            state["cwnd"] = max(1, state["cwnd"] * 0.7)
+            state["ssthresh"] = state["cwnd"]
+            state["last_congestion_time"] = time.time()
+            state["k"] = (state["w_max"] * 0.3) ** (1/3)
+            state["phase"] = "congestion_avoidance"
+        elif ack_received:
+            if state["phase"] == "slow_start":
+                state["cwnd"] += 1
+                if state["cwnd"] >= state["ssthresh"]:
+                    state["phase"] = "congestion_avoidance"
+            else:
+                t = time.time() - state["last_congestion_time"]
+                k = state["k"]
+                w_max = state["w_max"]
+                target = w_max * (1 - 0.7) * ((t - k) ** 3) + w_max
+                state["cwnd"] = max(state["cwnd"] + (target - state["cwnd"]) / state["cwnd"], 2)
+    
+    self.window_size = min(max(1, int(state["cwnd"])), 64)
+
 class FlowAllocationFSM:
     class State(Enum):
         INITIALIZED = auto()
