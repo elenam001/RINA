@@ -191,18 +191,16 @@ class RealisticNetwork:
         
     async def cleanup(self):
         """Clean up all resources"""
-        # Restore original send_data methods
         for (src_id, dst_id), (src_ipcp, original_send_data, net_cond) in self.network_conditions.items():
             src_ipcp.send_data = original_send_data
             await net_cond.stop()
-            
-        # Clean up flows
         for ipcp in self.ipcps.values():
             for flow_id in list(ipcp.flows.keys()):
                 try:
                     await ipcp.deallocate_flow(flow_id)
                 except:
                     pass
+
 
 
 

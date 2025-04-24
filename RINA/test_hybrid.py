@@ -1,3 +1,4 @@
+from collections import deque
 import pytest
 import pytest_asyncio
 import asyncio
@@ -139,6 +140,8 @@ async def test_hybrid_basic_connectivity(hybrid_net, realistic_network):
     
     # Enroll IPCPs
     await src_ipcp.enroll(dst_ipcp)
+
+    flow_id = await src_ipcp.allocate_flow(dst_ipcp, port=5000)
     
     # Create TCP adapter and connect to RINA
     adapter = await hybrid_net.create_tcp_adapter("test_adapter", host="127.0.0.1", port=8001)
@@ -204,6 +207,8 @@ async def test_throughput_hybrid_network(hybrid_net, realistic_network):
             
             await src_ipcp.enroll(dst_ipcp)
             
+            flow_id = await src_ipcp.allocate_flow(dst_ipcp, port=5000)
+
             # Create TCP adapter
             adapter_name = f"adapter_{profile_name}_{packet_size}"
             tcp_port = 8000 + hash(adapter_name) % 1000  # Generate a unique port
@@ -301,8 +306,7 @@ async def test_latency_jitter_hybrid(hybrid_net, realistic_network):
     dif = await hybrid_net.create_rina_dif("test_dif", layer=0)
     
     for profile_name, profile in network_conditions.NETWORK_PROFILES.items():
-        if profile_name in ["extreme", "satellite"] and samples_per_size > 20:
-            # Reduce samples for high latency profiles
+        if profile_name in ["congested"] and samples_per_size > 20:
             current_samples = 20
         else:
             current_samples = samples_per_size
@@ -320,8 +324,11 @@ async def test_latency_jitter_hybrid(hybrid_net, realistic_network):
             
             realistic_network.ipcps[src_ipcp_id] = src_ipcp
             realistic_network.ipcps[dst_ipcp_id] = dst_ipcp
+
             await src_ipcp.enroll(dst_ipcp)
             
+            flow_id = await src_ipcp.allocate_flow(dst_ipcp, port=5000)
+
             # Create TCP adapter
             adapter_name = f"adapter_{profile_name}_{packet_size}"
             tcp_port = 8000 + hash(adapter_name) % 1000  # Generate a unique port
@@ -399,6 +406,8 @@ async def test_packet_delivery_ratio_hybrid(hybrid_net, realistic_network):
             
             
             await src_ipcp.enroll(dst_ipcp)
+
+            flow_id = await src_ipcp.allocate_flow(dst_ipcp, port=5000)
             
             # Create TCP adapter
             adapter_name = f"adapter_{profile_name}_{packet_size}"
@@ -459,6 +468,8 @@ async def test_concurrent_tcp_connections(hybrid_net, realistic_network):
             
     
     await src_ipcp.enroll(dst_ipcp)
+
+    flow_id = await src_ipcp.allocate_flow(dst_ipcp, port=5000)
     
     # Create TCP adapter
     adapter = await hybrid_net.create_tcp_adapter("test_adapter", port=8100)
@@ -528,7 +539,7 @@ async def test_concurrent_tcp_connections(hybrid_net, realistic_network):
 @pytest.mark.asyncio
 async def test_bidirectional_communication(hybrid_net, realistic_network):
     """Test bidirectional communication between TCP client and RINA application"""
-    # Create network components
+    # Create network components - reuse existing DIFs if possible
     dif = await hybrid_net.create_rina_dif("test_dif", layer=0)
     src_ipcp = await hybrid_net.create_rina_ipcp("src_ipcp", "test_dif")
     dst_ipcp = await hybrid_net.create_rina_ipcp("dst_ipcp", "test_dif")
@@ -537,37 +548,32 @@ async def test_bidirectional_communication(hybrid_net, realistic_network):
     realistic_network.ipcps["dst_ipcp"] = dst_ipcp
     
     await src_ipcp.enroll(dst_ipcp)
+
+    flow_id = await src_ipcp.allocate_flow(dst_ipcp, port=5000)
     
-    # Create TCP adapter
+    # Create TCP adapter with smaller packet buffer
     adapter = await hybrid_net.create_tcp_adapter("test_adapter", port=8200)
+    adapter.packet_buffer = deque(maxlen=100)  # Reduce buffer size
     await hybrid_net.connect_adapter_to_rina("test_adapter", "src_ipcp", "test_dif")
     
-    # Create application with custom data handling - this is the key part
-    class CustomRINAApp(RINATCPApplication):
+    class OptimizedRINAApp(RINATCPApplication):
         async def on_data(self, data):
-            # For this test, don't call super().on_data() since we want to modify the response
-            
-            # Create a modified response
+            await super().on_data(data)
             if isinstance(data, bytes):
-                modified_response = b"RINA_RESPONSE:" + data
-                
-                # Find the flow that delivered this data and send back the response
-                for flow_id, flow in self.ipcp.flows.items():
-                    await self.ipcp.send_data(flow_id, modified_response)
-                    break  # Just use the first flow we find
-            
-            # Still add the data to receive buffer so we can verify it was received
-            self.receive_buffer.append(data)
-    
-    # Create an instance of our custom app
-    app = CustomRINAApp(name="app_dst", ipcp=dst_ipcp)
+                response = b"RINA_ACK:" + data
+                for flow_id in self.ipcp.flows:
+                    try:
+                        await self.ipcp.send_data(flow_id, response)
+                        break
+                    except Exception as e:
+                        logging.error(f"Error sending response: {str(e)}")
+
+    app = OptimizedRINAApp(name="app_dst", ipcp=dst_ipcp)
     await app.bind(5000)
     
-    # Start TCP adapter
-    await adapter.start_server()
+    adapter_task = asyncio.create_task(adapter.start_server())
     
-    # Connect via TCP
-    reader, writer = await asyncio.open_connection("127.0.0.1", 8200)
+    timeout = 2.0
     
     results = {
         "tcp_to_rina": False,
@@ -575,34 +581,47 @@ async def test_bidirectional_communication(hybrid_net, realistic_network):
         "round_trip": False
     }
     
-    # Test bidirectional communication
-    test_message = b"Hello from TCP to RINA"
     try:
-        # Send message from TCP to RINA
+        reader, writer = await asyncio.wait_for(
+            asyncio.open_connection("127.0.0.1", 8200),
+            timeout=timeout
+        )
+        
+        # Test bidirectional communication
+        test_message = b"Hello from TCP to RINA"
+        
+        # Send message from TCP to RINA with timeout
         writer.write(test_message)
-        await writer.drain()
+        await asyncio.wait_for(writer.drain(), timeout=timeout)
         
         # Wait for response from RINA
-        response = await asyncio.wait_for(reader.read(1024), timeout=2.0)
+        response = await asyncio.wait_for(reader.read(1024), timeout=timeout)
         
-        # Verify the response
-        expected_response = b"RINA_RESPONSE:" + test_message
-        
-        if response == test_message:  # Simple echo from adapter
-            results["tcp_to_rina"] = True
-            print("TCP to RINA communication successful")
-        elif response == expected_response:  # Modified response from RINA app
-            results["tcp_to_rina"] = True
-            results["rina_to_tcp"] = True
-            results["round_trip"] = True
-            print("Bidirectional TCP-RINA communication successful")
-        else:
-            print(f"Unexpected response: {response}")
+        expected_response = b"RINA_ACK:" + test_message
+        try:
+            response = await asyncio.wait_for(reader.read(1024), timeout=timeout)
+            if response == expected_response:
+                results.update({
+                    "tcp_to_rina": True,
+                    "rina_to_tcp": True,
+                    "round_trip": True
+                })
+            else:
+                logging.warning(f"Unexpected response: {response}")
+        except asyncio.TimeoutError:
+            logging.error("Timeout waiting for response")
+    except asyncio.TimeoutError:
+        logging.error("Operation timed out in bidirectional test")
     except Exception as e:
-        print(f"Error in bidirectional test: {str(e)}")
+        logging.error(f"Error in bidirectional test: {str(e)}")
     finally:
-        writer.close()
-        await writer.wait_closed()
+        # Clean up resources
+        if 'writer' in locals():
+            writer.close()
+            try:
+                await asyncio.wait_for(writer.wait_closed(), timeout=1.0)
+            except asyncio.TimeoutError:
+                logging.warning("Timeout waiting for connection to close")
     
     # Store results in metrics
     metrics["bidirectional_communication"] = results
@@ -622,6 +641,8 @@ async def test_tcp_reconnection_resilience(hybrid_net, realistic_network):
             
     
     await src_ipcp.enroll(dst_ipcp)
+
+    flow_id = await src_ipcp.allocate_flow(dst_ipcp, port=5000)
     
     # Create TCP adapter
     adapter = await hybrid_net.create_tcp_adapter("test_adapter", port=8300)
