@@ -200,7 +200,7 @@ async def test_latency_jitter_realistic(network):
     await network.create_dif("test_dif")
     
     for profile_name, profile in network_conditions.NETWORK_PROFILES.items():
-        if profile_name in ["extreme", "satellite"] and samples_per_size > 50:
+        if profile_name in ["congested"] and samples_per_size > 50:
             # Reduce samples for high latency profiles
             current_samples = 50
         else:
@@ -324,7 +324,7 @@ async def test_round_trip_time_realistic(network):
     await network.create_dif("test_dif")
     
     for profile_name, profile in network_conditions.NETWORK_PROFILES.items():
-        if profile_name in ["extreme", "satellite"]:
+        if profile_name in ["congested"]:
             # Reduce samples for high latency profiles
             current_samples = 20
         else:
