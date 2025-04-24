@@ -535,7 +535,6 @@ async def test_bidirectional_communication(hybrid_net, realistic_network):
 
     realistic_network.ipcps["src_ipcp"] = src_ipcp
     realistic_network.ipcps["dst_ipcp"] = dst_ipcp
-            
     
     await src_ipcp.enroll(dst_ipcp)
     
@@ -543,21 +542,25 @@ async def test_bidirectional_communication(hybrid_net, realistic_network):
     adapter = await hybrid_net.create_tcp_adapter("test_adapter", port=8200)
     await hybrid_net.connect_adapter_to_rina("test_adapter", "src_ipcp", "test_dif")
     
-    # Create application with custom data handling
-    app = await hybrid_net.create_hybrid_application("app_dst", dst_ipcp)
+    # Create application with custom data handling - this is the key part
+    class CustomRINAApp(RINATCPApplication):
+        async def on_data(self, data):
+            # For this test, don't call super().on_data() since we want to modify the response
+            
+            # Create a modified response
+            if isinstance(data, bytes):
+                modified_response = b"RINA_RESPONSE:" + data
+                
+                # Find the flow that delivered this data and send back the response
+                for flow_id, flow in self.ipcp.flows.items():
+                    await self.ipcp.send_data(flow_id, modified_response)
+                    break  # Just use the first flow we find
+            
+            # Still add the data to receive buffer so we can verify it was received
+            self.receive_buffer.append(data)
     
-    # Override app's on_data to send back a modified response
-    original_on_data = app.on_data
-    
-    async def custom_on_data(data):
-        await original_on_data(data)
-        # Echo back with a prefix to indicate it came from RINA app
-        if isinstance(data, bytes):
-            return b"RINA_RESPONSE:" + data
-        else:
-            return data
-    
-    app.on_data = custom_on_data
+    # Create an instance of our custom app
+    app = CustomRINAApp(name="app_dst", ipcp=dst_ipcp)
     await app.bind(5000)
     
     # Start TCP adapter
@@ -600,9 +603,6 @@ async def test_bidirectional_communication(hybrid_net, realistic_network):
     finally:
         writer.close()
         await writer.wait_closed()
-    
-    # Restore original on_data method
-    app.on_data = original_on_data
     
     # Store results in metrics
     metrics["bidirectional_communication"] = results
