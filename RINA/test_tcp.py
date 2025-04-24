@@ -13,7 +13,6 @@ import network_conditions
 
 logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(name)s - %(levelname)s - %(message)s')
 
-# Global metrics dictionary to store test results
 metrics = {}
 
 class TCPServer:
@@ -29,7 +28,7 @@ class TCPServer:
             self.handle_client, self.host, self.port
         )
         addr = self.server.sockets[0].getsockname()
-        self.port = addr[1]  # Get actual port in case it was 0
+        self.port = addr[1]  
         logging.info(f"TCP server started on {self.host}:{self.port}")
         
     async def handle_client(self, reader, writer):
@@ -39,10 +38,10 @@ class TCPServer:
         
         try:
             while True:
-                data = await reader.read(65536)  # Large buffer to handle various packet sizes
+                data = await reader.read(65536)  
                 if not data:
                     break
-                writer.write(data)  # Echo back the data
+                writer.write(data)  
                 await writer.drain()
         except Exception as e:
             logging.error(f"Error handling client {addr}: {str(e)}")
@@ -58,7 +57,7 @@ class TCPServer:
             self.server.close()
             await self.server.wait_closed()
             
-            # Close all client connections
+            
             for writer in self.clients:
                 writer.close()
                 await writer.wait_closed()
@@ -84,15 +83,12 @@ class TCPNetwork:
         if server_name not in self.servers:
             raise ValueError(f"Server {server_name} does not exist")
         
-        # Create a proxy server to apply network conditions
         original_server = self.servers[server_name]
-        proxy_port = original_server.port + 1000  # Use a different port for the proxy
+        proxy_port = original_server.port + 1000  
         
-        # Create network conditions simulator
         net_cond = network_conditions.TCPNetworkConditions(**conditions)
         await net_cond.start()
         
-        # Create a proxy server that will apply the network conditions
         class TCPProxy:
             def __init__(self, target_host, target_port, proxy_port, net_cond):
                 self.target_host = target_host
@@ -109,7 +105,7 @@ class TCPNetwork:
                 logging.info(f"TCP proxy started on 127.0.0.1:{self.proxy_port} -> {self.target_host}:{self.target_port}")
                 
             async def handle_client(self, client_reader, client_writer):
-                # Connect to target server
+                
                 try:
                     server_reader, server_writer = await asyncio.open_connection(
                         self.target_host, self.target_port
@@ -119,10 +115,8 @@ class TCPNetwork:
                     client_writer.close()
                     return
                 
-                # Bidirectional forwarding with network conditions
                 self.clients.add((client_writer, server_writer))
                 
-                # Forward client -> server with network conditions
                 async def forward_to_server():
                     try:
                         while True:
@@ -130,18 +124,17 @@ class TCPNetwork:
                             if not data:
                                 break
                             
-                            # Process packet through network conditions
+                            
                             await self.net_cond.process_packet(
                                 data, 
                                 server_writer,
-                                None  # No flow_id for TCP
+                                None  
                             )
                     except Exception as e:
                         logging.error(f"Error forwarding to server: {str(e)}")
                     finally:
                         server_writer.close()
                 
-                # Forward server -> client with network conditions
                 async def forward_to_client():
                     try:
                         while True:
@@ -149,23 +142,19 @@ class TCPNetwork:
                             if not data:
                                 break
                             
-                            # Direct forwarding from server to client
-                            # (We only simulate conditions in one direction)
+                            
+                            
                             client_writer.write(data)
                             await client_writer.drain()
                     except Exception as e:
                         logging.error(f"Error forwarding to client: {str(e)}")
                     finally:
                         client_writer.close()
-                
-                # Start both forwarding tasks
                 await asyncio.gather(
                     forward_to_server(),
                     forward_to_client(),
                     return_exceptions=True
                 )
-                
-                # Clean up
                 if (client_writer, server_writer) in self.clients:
                     self.clients.remove((client_writer, server_writer))
                 
@@ -173,18 +162,12 @@ class TCPNetwork:
                 if self.server:
                     self.server.close()
                     await self.server.wait_closed()
-                    
-                    # Close all client connections
                     for client_writer, server_writer in self.clients:
                         client_writer.close()
                         server_writer.close()
                     self.clients.clear()
                     logging.info("TCP proxy stopped")
-                    
-                # Stop the network conditions
                 await self.net_cond.stop()
-        
-        # Create and start the proxy
         proxy = TCPProxy(
             original_server.host,
             original_server.port,
@@ -192,20 +175,13 @@ class TCPNetwork:
             net_cond
         )
         await proxy.start()
-        
-        # Store the proxy in the network conditions dict
         self.network_conditions[server_name] = (proxy, net_cond)
-        
-        # Return the proxy port for clients to connect to
         return proxy_port
     
     async def shutdown(self):
         """Clean up all resources"""
-        # Stop all servers
         for server in self.servers.values():
             await server.stop()
-        
-        # Stop all proxies and network conditions
         for proxy, net_cond in self.network_conditions.values():
             await proxy.stop()
 
@@ -216,7 +192,6 @@ async def tcp_network():
     network = TCPNetwork()
     yield network
     await network.shutdown()
-
 
 async def measure_tcp_metrics(tcp_port, packet_size, packet_count, 
                             inter_packet_delay=0.001):
@@ -255,7 +230,7 @@ async def measure_tcp_metrics(tcp_port, packet_size, packet_count,
             response = await asyncio.wait_for(reader.read(packet_size), timeout=5.0)
             if response:
                 metrics["received"] += 1
-                rtt = (time.time() - packet_send_time) * 1000  # ms
+                rtt = (time.time() - packet_send_time) * 1000  
                 metrics["rtts_ms"].append(rtt)
                 latency = rtt / 2
                 metrics["latencies_ms"].append(latency)
@@ -277,11 +252,9 @@ async def measure_tcp_metrics(tcp_port, packet_size, packet_count,
         metrics["avg_latency_ms"] = statistics.mean(metrics["latencies_ms"])
         metrics["min_latency_ms"] = min(metrics["latencies_ms"])
         metrics["max_latency_ms"] = max(metrics["latencies_ms"])
-    
     if metrics["jitter_ms"]:
         metrics["avg_jitter_ms"] = statistics.mean(metrics["jitter_ms"])
         metrics["max_jitter_ms"] = max(metrics["jitter_ms"])
-    
     if metrics["rtts_ms"]:
         metrics["avg_rtt_ms"] = statistics.mean(metrics["rtts_ms"])
         metrics["min_rtt_ms"] = min(metrics["rtts_ms"])
@@ -291,7 +264,6 @@ async def measure_tcp_metrics(tcp_port, packet_size, packet_count,
     await writer.wait_closed()
     
     return metrics
-
 
 @pytest.mark.asyncio
 async def test_tcp_basic_connectivity(tcp_network):
@@ -318,13 +290,12 @@ async def test_tcp_basic_connectivity(tcp_network):
     
     return True
 
-
 @pytest.mark.asyncio
 async def test_throughput_tcp_network(tcp_network):
     """Test throughput across different realistic network profiles in TCP"""
     results = {}
     packet_sizes = [64, 512, 1024, 4096]
-    test_duration = 3.0  # seconds
+    test_duration = 3.0  
     
     for profile_name, profile in network_conditions.NETWORK_PROFILES.items():
         print(f"\nTesting throughput on {profile_name} TCP network profile")
@@ -334,7 +305,7 @@ async def test_throughput_tcp_network(tcp_network):
             server_name = f"server_{profile_name}_{packet_size}"
             server = await tcp_network.create_tcp_server(server_name)
             
-            # Apply network conditions and get the proxy port
+            
             proxy_port = await tcp_network.set_network_conditions(server_name, profile)
             
             try:
@@ -361,13 +332,13 @@ async def test_throughput_tcp_network(tcp_network):
                         if response:
                             packets_received += 1
                     except asyncio.TimeoutError:
-                        pass  # Continue without waiting for response
+                        pass  
                     if profile["bandwidth_mbps"]:
-                        # Calculate theoretical time to send based on bandwidth
+                        
                         packet_time = (packet_size * 8) / (profile["bandwidth_mbps"] * 1_000_000)
-                        await asyncio.sleep(packet_time * 0.5)  # Sleep slightly less than theoretical time
+                        await asyncio.sleep(packet_time * 0.5)  
                     else:
-                        await asyncio.sleep(0.001)  # Minimal sleep
+                        await asyncio.sleep(0.001)  
             except Exception as e:
                 logging.error(f"Error during throughput test: {str(e)}")
             finally:
@@ -395,7 +366,6 @@ async def test_throughput_tcp_network(tcp_network):
     metrics["throughput_tcp_network"] = results
     return results
 
-
 @pytest.mark.asyncio
 async def test_latency_jitter_tcp(tcp_network):
     """Test latency and jitter across different network profiles in TCP"""
@@ -416,14 +386,13 @@ async def test_latency_jitter_tcp(tcp_network):
             server_name = f"server_{profile_name}_{packet_size}"
             server = await tcp_network.create_tcp_server(server_name)
             
-            # Apply network conditions and get the proxy port
             proxy_port = await tcp_network.set_network_conditions(server_name, profile)
             
             test_metrics = await measure_tcp_metrics(
                 tcp_port=proxy_port,
                 packet_size=packet_size,
                 packet_count=current_samples,
-                inter_packet_delay=0.05  # Increased to reduce congestion
+                inter_packet_delay=0.05  
             )
             
             profile_results[packet_size] = {
@@ -444,7 +413,6 @@ async def test_latency_jitter_tcp(tcp_network):
         
         results[profile_name] = profile_results
     
-    # Store results in the global metrics dictionary
     metrics["latency_jitter_tcp"] = results
     return results
 
@@ -454,11 +422,9 @@ async def test_packet_delivery_ratio_tcp(tcp_network):
     """Test PDR under different network profiles and loads in TCP"""
     results = {}
     
-    # Parameters
     packet_sizes = [64, 1024]
     packets_per_test = 200
     
-    # Test different network profiles
     for profile_name, profile in network_conditions.NETWORK_PROFILES.items():
         print(f"\nTesting packet delivery ratio on {profile_name} TCP network profile")
         profile_results = {}
@@ -467,43 +433,32 @@ async def test_packet_delivery_ratio_tcp(tcp_network):
             server_name = f"server_{profile_name}_{packet_size}"
             server = await tcp_network.create_tcp_server(server_name)
             
-            # Apply network conditions and get the proxy port
             proxy_port = await tcp_network.set_network_conditions(server_name, profile)
             
-            # Measure metrics
             test_metrics = await measure_tcp_metrics(
                 tcp_port=proxy_port,
                 packet_size=packet_size,
                 packet_count=packets_per_test,
-                inter_packet_delay=0.02  # Give packets time to arrive
+                inter_packet_delay=0.02  
             )
-            
             profile_results[packet_size] = {
                 "sent": test_metrics["sent"],
                 "received": test_metrics["received"],
                 "delivery_ratio": test_metrics["delivery_ratio"]
             }
-            
             print(f"  Packet size: {packet_size} bytes - "
                   f"PDR: {test_metrics['delivery_ratio']:.2f}% "
                   f"({test_metrics['received']}/{test_metrics['sent']} packets)")
         
         results[profile_name] = profile_results
-    
-    # Store results in the global metrics dictionary
     metrics["packet_delivery_ratio_tcp"] = results
     return results
-
 
 @pytest.mark.asyncio
 async def test_concurrent_tcp_connections(tcp_network):
     """Test scalability with concurrent TCP connections"""
     results = {}
-    
-    # Parameters
     connection_counts = [1, 5, 10, 25]
-    
-    # Create base server
     server = await tcp_network.create_tcp_server("concurrent_test_server")
     
     for connection_count in connection_counts:
@@ -513,8 +468,6 @@ async def test_concurrent_tcp_connections(tcp_network):
         connections = []
         success_count = 0
         data_success = 0
-        
-        # Establish connections
         for i in range(connection_count):
             try:
                 reader, writer = await asyncio.open_connection("127.0.0.1", server.port)
@@ -522,28 +475,20 @@ async def test_concurrent_tcp_connections(tcp_network):
                 success_count += 1
             except Exception as e:
                 logging.error(f"Failed to establish TCP connection {i+1}: {str(e)}")
-        
         establishment_time = time.time() - start_time
-        
-        # Send data through all connections
         test_data = b"test_data"
         for i, (reader, writer) in enumerate(connections):
             try:
                 writer.write(test_data)
                 await writer.drain()
-                
-                # Wait for response
                 response = await asyncio.wait_for(reader.read(len(test_data)), timeout=2.0)
                 if response == test_data:
                     data_success += 1
             except Exception as e:
                 logging.error(f"Error sending/receiving data through connection {i+1}: {str(e)}")
-        
-        # Close all connections
         for reader, writer in connections:
             writer.close()
             await writer.wait_closed()
-        
         results[connection_count] = {
             "target_connections": connection_count,
             "successful_connections": success_count,
@@ -551,22 +496,17 @@ async def test_concurrent_tcp_connections(tcp_network):
             "establishment_time_per_conn_ms": (establishment_time * 1000) / max(success_count, 1),
             "data_exchange_success_rate": (data_success / max(success_count, 1)) * 100
         }
-        
         print(f"Results: {success_count}/{connection_count} connections established in {establishment_time:.2f}s "
               f"({results[connection_count]['establishment_time_per_conn_ms']:.2f}ms per connection)")
         print(f"Data exchange success rate: {results[connection_count]['data_exchange_success_rate']:.2f}%")
-    
-    # Store results in global metrics
     metrics["concurrent_tcp_connections"] = results
     return results
-
 
 @pytest.fixture(scope="session", autouse=True)
 def save_metrics():
     yield
     with open("tcp_metrics.json", "w") as f:
         json.dump(metrics, f, indent=2)
-
 
 if __name__ == "__main__":
     pytest.main(["-xvs", "test_tcp_network.py"])
