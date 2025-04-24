@@ -4,6 +4,7 @@ import socket
 import time
 import logging
 from collections import deque
+from network_conditions import TCPNetworkConditions
 from rina.dif import DIF
 from rina.ipcp import IPCP
 from rina.application import Application
@@ -25,6 +26,7 @@ class TCPIPAdapter:
             'bytes_sent': 0,
             'bytes_received': 0
         }
+        self.network_conditions = None
         
     async def start_server(self):
         """Start TCP server to accept connections"""
@@ -41,6 +43,16 @@ class TCPIPAdapter:
         if self.server:
             async with self.server:
                 await self.server.serve_forever()
+
+    async def set_network_conditions(self, conditions):
+        """Set network conditions for this TCP adapter"""
+        if self.network_conditions:
+            await self.network_conditions.stop()
+        
+        self.network_conditions = TCPNetworkConditions(**conditions)
+        await self.network_conditions.start()
+        logging.info(f"Set TCP network conditions: {conditions}")
+        return self.network_conditions
         
     async def handle_connection(self, reader, writer):
         """Handle incoming TCP connection"""
@@ -74,9 +86,15 @@ class TCPIPAdapter:
                             break
                         self.stats['received_packets'] += 1
                         self.stats['bytes_received'] += len(data)
-                        # Echo it back for simple testing
-                        writer.write(data)
-                        await writer.drain()
+                        
+                        # Apply network conditions if they exist
+                        if self.network_conditions:
+                            await self.network_conditions.process_packet(data, writer)
+                        else:
+                            # Echo it back for simple testing
+                            writer.write(data)
+                            await writer.drain()
+                        
                         self.stats['sent_packets'] += 1
                         self.stats['bytes_sent'] += len(data)
                     except asyncio.TimeoutError:
@@ -187,8 +205,13 @@ class TCPIPAdapter:
                     if not data:
                         continue
                     
-                    writer.write(data)
-                    await writer.drain()
+                    # Apply network conditions if set
+                    if self.network_conditions:
+                        await self.network_conditions.process_packet(data, writer)
+                    else:
+                        writer.write(data)
+                        await writer.drain()
+                    
                     self.stats['sent_packets'] += 1
                     self.stats['bytes_sent'] += len(data)
                     logging.debug(f"RINA→TCP: {len(data)} bytes from flow {flow_id} to {connection_id}")
@@ -309,6 +332,17 @@ class HybridNetwork:
         self.tcp_adapters = {}
         self.rina_apps = {}
         self.tcp_apps = {}
+
+    async def set_tcp_adapter_network_conditions(self, adapter_name, conditions):
+        """Set network conditions for a TCP adapter"""
+        if adapter_name not in self.tcp_adapters:
+            logging.error(f"TCP Adapter {adapter_name} not found")
+            return False
+            
+        adapter = self.tcp_adapters[adapter_name]
+        await adapter.set_network_conditions(conditions)
+        logging.info(f"Set network conditions for adapter {adapter_name}: {conditions}")
+        return True
     
     async def create_rina_dif(self, name, layer, max_bandwidth=1000):
         """Create a RINA DIF"""

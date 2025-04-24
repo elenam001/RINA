@@ -16,23 +16,6 @@ logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(name)s - %(level
 # Global metrics dictionary to store test results
 metrics = {}
 
-class TCPNetworkConditions(network_conditions.NetworkConditions):
-    """Network conditions simulator for TCP connections"""
-    
-    async def process_packet(self, data, writer, flow_id=None):
-        """Process a TCP packet with network conditions applied"""
-        await self.queue.put((data, writer, None))
-    
-    async def _delayed_delivery(self, delay, packet, writer, flow_id):
-        """Deliver a TCP packet after the specified delay"""
-        await asyncio.sleep(delay)
-        try:
-            if writer and not writer.is_closing():
-                writer.write(packet)
-                await writer.drain()
-        except Exception as e:
-            print(f"Error delivering TCP packet: {str(e)}")
-
 class TCPServer:
     """Simple TCP echo server for testing"""
     def __init__(self, host="127.0.0.1", port=0):
@@ -106,7 +89,7 @@ class TCPNetwork:
         proxy_port = original_server.port + 1000  # Use a different port for the proxy
         
         # Create network conditions simulator
-        net_cond = TCPNetworkConditions(**conditions)
+        net_cond = network_conditions.TCPNetworkConditions(**conditions)
         await net_cond.start()
         
         # Create a proxy server that will apply the network conditions

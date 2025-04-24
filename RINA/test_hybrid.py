@@ -121,7 +121,7 @@ async def test_hybrid_basic_connectivity(hybrid_net, realistic_network):
     
     adapter = await hybrid_net.create_tcp_adapter("test_adapter", host="127.0.0.1", port=8001)
     await hybrid_net.connect_adapter_to_rina("test_adapter", "src_ipcp", "test_dif")
-    
+
     await adapter.start_server()
     
     hybrid_app = await hybrid_net.create_hybrid_application("test_app", dst_ipcp, adapter_name="test_adapter")
@@ -177,11 +177,15 @@ async def test_throughput_hybrid_network(hybrid_net, realistic_network):
             adapter = await hybrid_net.create_tcp_adapter(adapter_name, port=tcp_port)
             await hybrid_net.connect_adapter_to_rina(adapter_name, src_ipcp_id, "test_dif")
             
+            # Apply network conditions to both RINA and TCP
+            await realistic_network.set_network_conditions(src_ipcp_id, dst_ipcp_id, profile)
+            await hybrid_net.set_tcp_adapter_network_conditions(adapter_name, profile)
+            
             app_src = await hybrid_net.create_hybrid_application(f"app_src_{profile_name}_{packet_size}", src_ipcp)
             app_dst = await hybrid_net.create_hybrid_application(f"app_dst_{profile_name}_{packet_size}", dst_ipcp)
             await app_dst.bind(5000)
             await adapter.start_server()
-            await realistic_network.set_network_conditions(src_ipcp_id, dst_ipcp_id, profile)
+            
             try:
                 reader, writer = await asyncio.open_connection("127.0.0.1", tcp_port)
             except Exception as e:
@@ -273,11 +277,12 @@ async def test_latency_jitter_hybrid(hybrid_net, realistic_network):
             tcp_port = 8000 + hash(adapter_name) % 1000  # Generate a unique port
             adapter = await hybrid_net.create_tcp_adapter(adapter_name, port=tcp_port)
             await hybrid_net.connect_adapter_to_rina(adapter_name, src_ipcp_id, "test_dif")
-            
+            await hybrid_net.set_tcp_adapter_network_conditions(adapter_name, profile)
+            await realistic_network.set_network_conditions(src_ipcp_id, dst_ipcp_id, profile)
+
             app_dst = await hybrid_net.create_hybrid_application(f"app_dst_{profile_name}_{packet_size}", dst_ipcp)
             await app_dst.bind(5000)
             await adapter.start_server()
-            await realistic_network.set_network_conditions(src_ipcp_id, dst_ipcp_id, profile)
             test_metrics = await measure_hybrid_flow_metrics(
                 adapter,
                 ("127.0.0.1", tcp_port),
@@ -346,7 +351,8 @@ async def test_packet_delivery_ratio_hybrid(hybrid_net, realistic_network):
             tcp_port = 8000 + hash(adapter_name) % 1000  # Generate a unique port
             adapter = await hybrid_net.create_tcp_adapter(adapter_name, port=tcp_port)
             await hybrid_net.connect_adapter_to_rina(adapter_name, src_ipcp_id, "test_dif")
-            
+            await hybrid_net.set_tcp_adapter_network_conditions(adapter_name, profile)
+
             # Create applications
             app_dst = await hybrid_net.create_hybrid_application(f"app_dst_{profile_name}_{packet_size}", dst_ipcp)
             await app_dst.bind(5000)
@@ -406,7 +412,6 @@ async def test_concurrent_tcp_connections(hybrid_net, realistic_network):
     # Create TCP adapter
     adapter = await hybrid_net.create_tcp_adapter("test_adapter", port=8100)
     await hybrid_net.connect_adapter_to_rina("test_adapter", "src_ipcp", "test_dif")
-    
     # Create application
     app = await hybrid_net.create_hybrid_application("app_dst", dst_ipcp)
     await app.bind(5000)

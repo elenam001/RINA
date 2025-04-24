@@ -165,6 +165,94 @@ class RealisticNetwork:
                 except:
                     pass
 
+class TCPNetworkConditions(NetworkConditions):
+    """Network conditions simulator for TCP connections"""
+    
+    def __init__(self, 
+                 latency_ms=0, 
+                 jitter_ms=0, 
+                 packet_loss_rate=0, 
+                 bandwidth_mbps=None,
+                 corruption_rate=0,
+                 reordering_rate=0):
+        super().__init__(latency_ms, jitter_ms, packet_loss_rate, 
+                         bandwidth_mbps, corruption_rate, reordering_rate)
+        # Queue for TCP packets specifically
+        self.tcp_queue = asyncio.Queue()
+        self.tcp_processing_task = None
+    
+    async def start(self):
+        """Start processing packets"""
+        await super().start()
+        self.tcp_processing_task = asyncio.create_task(self._process_tcp_queue())
+        
+    async def stop(self):
+        """Stop processing packets"""
+        await super().stop()
+        if self.tcp_processing_task:
+            self.tcp_processing_task.cancel()
+            try:
+                await self.tcp_processing_task
+            except asyncio.CancelledError:
+                pass
+    
+    async def process_packet(self, data, writer, flow_id=None):
+        """Process a TCP packet with network conditions applied"""
+        await self.tcp_queue.put((data, writer, None))
+    
+    async def _process_tcp_queue(self):
+        """Process TCP packets with network conditions"""
+        while True:
+            data, writer, _ = await self.tcp_queue.get()
+            
+            # Apply bandwidth limitation if specified
+            if self.bandwidth_mbps:
+                packet_size_bits = len(data) * 8
+                theoretical_time = packet_size_bits / (self.bandwidth_mbps * 1_000_000)
+                self.bytes_sent += len(data)
+                elapsed = time.time() - self.start_time
+                expected_elapsed = (self.bytes_sent * 8) / (self.bandwidth_mbps * 1_000_000)
+                if expected_elapsed > elapsed:
+                    await asyncio.sleep(expected_elapsed - elapsed)
+            
+            # Apply packet loss
+            if random.random() < self.packet_loss_rate:
+                self.tcp_queue.task_done()
+                continue
+                
+            # Apply packet corruption
+            if random.random() < self.corruption_rate:
+                if isinstance(data, bytes) and len(data) > 0:
+                    pos = random.randrange(len(data))
+                    corrupt_byte = data[pos] ^ random.randint(1, 255)
+                    data = data[:pos] + bytes([corrupt_byte]) + data[pos+1:]
+            
+            # Calculate latency with jitter
+            latency = self.latency_ms / 1000  # Convert to seconds
+            if self.jitter_ms > 0:
+                jitter = random.uniform(-self.jitter_ms/1000, self.jitter_ms/1000)
+                latency += jitter
+                
+            # Apply packet reordering
+            if random.random() < self.reordering_rate:
+                reorder_delay = latency * 2  # Reordered packets arrive later
+                asyncio.create_task(self._delayed_delivery(reorder_delay, data, writer, None))
+            else:
+                await self._delayed_delivery(latency, data, writer, None)
+                
+            self.tcp_queue.task_done()
+    
+    async def _delayed_delivery(self, delay, packet, writer, flow_id):
+        """Deliver a TCP packet after the specified delay"""
+        await asyncio.sleep(delay)
+        try:
+            if writer and not writer.is_closing():
+                writer.write(packet)
+                await writer.drain()
+        except Exception as e:
+            print(f"Error delivering TCP packet: {str(e)}")
+
+
 NETWORK_PROFILES = {
     "perfect": {
         "latency_ms": 0,

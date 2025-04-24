@@ -23,7 +23,6 @@ async def measure_flow_metrics(src_ipcp, dst_ipcp, packet_size, packet_count,
     """Helper function to measure metrics for a flow"""
     start_time = time.time()
     
-    # Create a flow
     flow_id = await src_ipcp.allocate_flow(dst_ipcp, port=5000, qos=flow_qos)
     flow_setup_time = time.time() - start_time
     
