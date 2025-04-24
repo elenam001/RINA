@@ -495,7 +495,7 @@ async def test_scalability_concurrent_flows(network):
 @pytest.fixture(scope="session", autouse=True)
 def save_metrics():
     yield
-    with open("metrics.json", "w") as f:
+    with open("rina_metrics.json", "w") as f:
         json.dump(metrics, f, indent=2)
 
 if __name__ == "__main__":

@@ -1,0 +1,578 @@
+{
+  "throughput_realistic_networks": {
+    "perfect": {
+      "64": {
+        "throughput_mbps": 1.1623811611910837,
+        "packets_sent": 12523,
+        "packets_per_second": 2270.2757054513354,
+        "bytes_sent": 801472,
+        "elapsed_seconds": 5.516070127487183
+      },
+      "512": {
+        "throughput_mbps": 9.25737952387476,
+        "packets_sent": 12438,
+        "packets_per_second": 2260.1024228209862,
+        "bytes_sent": 6368256,
+        "elapsed_seconds": 5.503290414810181
+      },
+      "1024": {
+        "throughput_mbps": 19.79501394091618,
+        "packets_sent": 13308,
+        "packets_per_second": 2416.3835377094947,
+        "bytes_sent": 13627392,
+        "elapsed_seconds": 5.50740385055542
+      },
+      "4096": {
+        "throughput_mbps": 77.3014904660843,
+        "packets_sent": 13006,
+        "packets_per_second": 2359.0542744776703,
+        "bytes_sent": 53272576,
+        "elapsed_seconds": 5.513226270675659
+      },
+      "8192": {
+        "throughput_mbps": 155.21403908127127,
+        "packets_sent": 13060,
+        "packets_per_second": 2368.3782818797495,
+        "bytes_sent": 106987520,
+        "elapsed_seconds": 5.514321804046631
+      }
+    },
+    "lan": {
+      "64": {
+        "throughput_mbps": 31.482029417458786,
+        "packets_sent": 338405,
+        "packets_per_second": 61488.338705974194,
+        "bytes_sent": 21657920,
+        "elapsed_seconds": 5.50356388092041
+      },
+      "512": {
+        "throughput_mbps": 65.05118988398483,
+        "packets_sent": 87478,
+        "packets_per_second": 15881.638155269735,
+        "bytes_sent": 44788736,
+        "elapsed_seconds": 5.508121967315674
+      },
+      "1024": {
+        "throughput_mbps": 28.995578641862657,
+        "packets_sent": 19484,
+        "packets_per_second": 3539.4993459305,
+        "bytes_sent": 19951616,
+        "elapsed_seconds": 5.504733324050903
+      },
+      "4096": {
+        "throughput_mbps": 5.20982559025362,
+        "packets_sent": 877,
+        "packets_per_second": 158.99125946818907,
+        "bytes_sent": 3592192,
+        "elapsed_seconds": 5.516026496887207
+      },
+      "8192": {
+        "throughput_mbps": 7.583376231063224,
+        "packets_sent": 638,
+        "packets_per_second": 115.71313829137,
+        "bytes_sent": 5226496,
+        "elapsed_seconds": 5.513634920120239
+      }
+    },
+    "wifi": {
+      "64": {
+        "throughput_mbps": 4.446362957629094,
+        "packets_sent": 47845,
+        "packets_per_second": 8684.302651619324,
+        "bytes_sent": 3062080,
+        "elapsed_seconds": 5.509365797042847
+      },
+      "512": {
+        "throughput_mbps": 0.4730672251923438,
+        "packets_sent": 636,
+        "packets_per_second": 115.49492802547456,
+        "bytes_sent": 325632,
+        "elapsed_seconds": 5.506735324859619
+      },
+      "1024": {
+        "throughput_mbps": 0.9311665254799799,
+        "packets_sent": 626,
+        "packets_per_second": 113.66778875488036,
+        "bytes_sent": 641024,
+        "elapsed_seconds": 5.507277011871338
+      },
+      "4096": {
+        "throughput_mbps": 3.3321372242320946,
+        "packets_sent": 561,
+        "packets_per_second": 101.6887580637236,
+        "bytes_sent": 2297856,
+        "elapsed_seconds": 5.516834020614624
+      },
+      "8192": {
+        "throughput_mbps": 4.267755155925873,
+        "packets_sent": 359,
+        "packets_per_second": 65.12077569466969,
+        "bytes_sent": 2940928,
+        "elapsed_seconds": 5.512833595275879
+      }
+    },
+    "congested": {
+      "64": {
+        "throughput_mbps": 0.060622353416528316,
+        "packets_sent": 653,
+        "packets_per_second": 118.40303401665686,
+        "bytes_sent": 41792,
+        "elapsed_seconds": 5.515061378479004
+      },
+      "512": {
+        "throughput_mbps": 0.2757138654386977,
+        "packets_sent": 371,
+        "packets_per_second": 67.31295542936955,
+        "bytes_sent": 189952,
+        "elapsed_seconds": 5.511569023132324
+      },
+      "1024": {
+        "throughput_mbps": 0.46823331905212423,
+        "packets_sent": 315,
+        "packets_per_second": 57.15738757960501,
+        "bytes_sent": 322560,
+        "elapsed_seconds": 5.511098623275757
+      },
+      "4096": {
+        "throughput_mbps": 1.7506384016188028,
+        "packets_sent": 295,
+        "packets_per_second": 53.42524419002694,
+        "bytes_sent": 1208320,
+        "elapsed_seconds": 5.521734237670898
+      },
+      "8192": {
+        "throughput_mbps": 3.498165932232094,
+        "packets_sent": 294,
+        "packets_per_second": 53.37777606555319,
+        "bytes_sent": 2408448,
+        "elapsed_seconds": 5.507910251617432
+      }
+    }
+  },
+  "latency_jitter_realistic": {
+    "perfect": {
+      "64": {
+        "avg_latency_ms": 30.142072439193726,
+        "min_latency_ms": 25.701403617858887,
+        "max_latency_ms": 34.6529483795166,
+        "avg_jitter_ms": 4.142462605177754,
+        "max_jitter_ms": 7.915735244750977,
+        "avg_rtt_ms": 60.28414487838745
+      },
+      "512": {
+        "avg_latency_ms": 29.828007221221924,
+        "min_latency_ms": 25.251030921936035,
+        "max_latency_ms": 34.694790840148926,
+        "avg_jitter_ms": 4.483828640947438,
+        "max_jitter_ms": 8.166313171386719,
+        "avg_rtt_ms": 59.65601444244385
+      },
+      "1024": {
+        "avg_latency_ms": 29.996278285980225,
+        "min_latency_ms": 26.03435516357422,
+        "max_latency_ms": 34.68179702758789,
+        "avg_jitter_ms": 4.470703577754473,
+        "max_jitter_ms": 8.588314056396484,
+        "avg_rtt_ms": 59.99255657196045
+      },
+      "4096": {
+        "avg_latency_ms": 30.062302350997925,
+        "min_latency_ms": 25.78413486480713,
+        "max_latency_ms": 36.49091720581055,
+        "avg_jitter_ms": 4.524504295503251,
+        "max_jitter_ms": 8.316397666931152,
+        "avg_rtt_ms": 60.12460470199585
+      }
+    },
+    "lan": {
+      "64": {
+        "avg_latency_ms": 29.956315755844116,
+        "min_latency_ms": 25.346994400024414,
+        "max_latency_ms": 34.60347652435303,
+        "avg_jitter_ms": 4.289198403406625,
+        "max_jitter_ms": 8.252382278442383,
+        "avg_rtt_ms": 59.91263151168823
+      },
+      "512": {
+        "avg_latency_ms": 30.000016689300537,
+        "min_latency_ms": 25.072932243347168,
+        "max_latency_ms": 34.84475612640381,
+        "avg_jitter_ms": 4.46542946979253,
+        "max_jitter_ms": 8.513927459716797,
+        "avg_rtt_ms": 60.000033378601074
+      },
+      "1024": {
+        "avg_latency_ms": 29.914700984954834,
+        "min_latency_ms": 25.131702423095703,
+        "max_latency_ms": 34.677863121032715,
+        "avg_jitter_ms": 4.4830748529145215,
+        "max_jitter_ms": 8.5829496383667,
+        "avg_rtt_ms": 59.82940196990967
+      },
+      "4096": {
+        "avg_latency_ms": 30.23766279220581,
+        "min_latency_ms": 25.970101356506348,
+        "max_latency_ms": 38.3758544921875,
+        "avg_jitter_ms": 4.3891006045871315,
+        "max_jitter_ms": 8.075237274169922,
+        "avg_rtt_ms": 60.47532558441162
+      }
+    },
+    "wifi": {
+      "64": {
+        "avg_latency_ms": 30.00507950782776,
+        "min_latency_ms": 25.53844451904297,
+        "max_latency_ms": 34.64949131011963,
+        "avg_jitter_ms": 4.452029863993327,
+        "max_jitter_ms": 8.325338363647461,
+        "avg_rtt_ms": 60.01015901565552
+      },
+      "512": {
+        "avg_latency_ms": 29.92087483406067,
+        "min_latency_ms": 25.40874481201172,
+        "max_latency_ms": 35.18664836883545,
+        "avg_jitter_ms": 4.157231311605434,
+        "max_jitter_ms": 7.970571517944336,
+        "avg_rtt_ms": 59.84174966812134
+      },
+      "1024": {
+        "avg_latency_ms": 30.226187705993652,
+        "min_latency_ms": 25.60579776763916,
+        "max_latency_ms": 36.43786907196045,
+        "avg_jitter_ms": 4.107327172250459,
+        "max_jitter_ms": 8.566856384277344,
+        "avg_rtt_ms": 60.452375411987305
+      },
+      "4096": {
+        "avg_latency_ms": 30.258926153182983,
+        "min_latency_ms": 25.532841682434082,
+        "max_latency_ms": 35.81500053405762,
+        "avg_jitter_ms": 4.219441702871611,
+        "max_jitter_ms": 9.046435356140137,
+        "avg_rtt_ms": 60.51785230636597
+      }
+    },
+    "congested": {
+      "64": {
+        "avg_latency_ms": 30.040743350982666,
+        "min_latency_ms": 25.371789932250977,
+        "max_latency_ms": 35.17639636993408,
+        "avg_jitter_ms": 4.503945915066466,
+        "max_jitter_ms": 9.151220321655273,
+        "avg_rtt_ms": 60.08148670196533
+      },
+      "512": {
+        "avg_latency_ms": 30.067670345306396,
+        "min_latency_ms": 25.272369384765625,
+        "max_latency_ms": 34.68024730682373,
+        "avg_jitter_ms": 4.0467928866950835,
+        "max_jitter_ms": 7.885575294494629,
+        "avg_rtt_ms": 60.13534069061279
+      },
+      "1024": {
+        "avg_latency_ms": 29.835402965545654,
+        "min_latency_ms": 25.58159828186035,
+        "max_latency_ms": 34.601449966430664,
+        "avg_jitter_ms": 4.827881345943529,
+        "max_jitter_ms": 8.924365043640137,
+        "avg_rtt_ms": 59.67080593109131
+      },
+      "4096": {
+        "avg_latency_ms": 30.05260944366455,
+        "min_latency_ms": 25.333046913146973,
+        "max_latency_ms": 36.03315353393555,
+        "avg_jitter_ms": 3.7785525224646745,
+        "max_jitter_ms": 9.284377098083496,
+        "avg_rtt_ms": 60.1052188873291
+      }
+    }
+  },
+  "packet_delivery_ratio_realistic": {
+    "perfect": {
+      "64": {
+        "sent": 500,
+        "received": 500,
+        "delivery_ratio": 100.0
+      },
+      "1024": {
+        "sent": 500,
+        "received": 500,
+        "delivery_ratio": 100.0
+      },
+      "4096": {
+        "sent": 500,
+        "received": 500,
+        "delivery_ratio": 100.0
+      }
+    },
+    "lan": {
+      "64": {
+        "sent": 500,
+        "received": 499,
+        "delivery_ratio": 99.8
+      },
+      "1024": {
+        "sent": 500,
+        "received": 499,
+        "delivery_ratio": 99.8
+      },
+      "4096": {
+        "sent": 500,
+        "received": 500,
+        "delivery_ratio": 100.0
+      }
+    },
+    "wifi": {
+      "64": {
+        "sent": 500,
+        "received": 498,
+        "delivery_ratio": 99.6
+      },
+      "1024": {
+        "sent": 500,
+        "received": 499,
+        "delivery_ratio": 99.8
+      },
+      "4096": {
+        "sent": 500,
+        "received": 498,
+        "delivery_ratio": 99.6
+      }
+    },
+    "congested": {
+      "64": {
+        "sent": 500,
+        "received": 85,
+        "delivery_ratio": 17.0
+      },
+      "1024": {
+        "sent": 500,
+        "received": 87,
+        "delivery_ratio": 17.4
+      },
+      "4096": {
+        "sent": 500,
+        "received": 94,
+        "delivery_ratio": 18.8
+      }
+    }
+  },
+  "round_trip_time_realistic": {
+    "perfect": {
+      "64": {
+        "avg_rtt_ms": 59.07064437866211,
+        "min_rtt_ms": 50.18901824951172,
+        "max_rtt_ms": 69.24819946289062
+      },
+      "512": {
+        "avg_rtt_ms": 60.11425495147705,
+        "min_rtt_ms": 53.038835525512695,
+        "max_rtt_ms": 69.52214241027832
+      },
+      "1024": {
+        "avg_rtt_ms": 60.10087013244629,
+        "min_rtt_ms": 51.09739303588867,
+        "max_rtt_ms": 69.33951377868652
+      },
+      "4096": {
+        "avg_rtt_ms": 60.168304443359375,
+        "min_rtt_ms": 51.28335952758789,
+        "max_rtt_ms": 69.2596435546875
+      }
+    },
+    "lan": {
+      "64": {
+        "avg_rtt_ms": 60.412864685058594,
+        "min_rtt_ms": 52.127838134765625,
+        "max_rtt_ms": 69.2129135131836
+      },
+      "512": {
+        "avg_rtt_ms": 60.45668125152588,
+        "min_rtt_ms": 53.23934555053711,
+        "max_rtt_ms": 70.53804397583008
+      },
+      "1024": {
+        "avg_rtt_ms": 60.067033767700195,
+        "min_rtt_ms": 51.21326446533203,
+        "max_rtt_ms": 69.99850273132324
+      },
+      "4096": {
+        "avg_rtt_ms": 60.56535243988037,
+        "min_rtt_ms": 51.54252052307129,
+        "max_rtt_ms": 69.21005249023438
+      }
+    },
+    "wifi": {
+      "64": {
+        "avg_rtt_ms": 60.6036901473999,
+        "min_rtt_ms": 51.72896385192871,
+        "max_rtt_ms": 69.69070434570312
+      },
+      "512": {
+        "avg_rtt_ms": 59.86091613769531,
+        "min_rtt_ms": 52.15954780578613,
+        "max_rtt_ms": 69.32282447814941
+      },
+      "1024": {
+        "avg_rtt_ms": 60.44656753540039,
+        "min_rtt_ms": 50.72307586669922,
+        "max_rtt_ms": 75.64949989318848
+      },
+      "4096": {
+        "avg_rtt_ms": 59.723262786865234,
+        "min_rtt_ms": 50.21047592163086,
+        "max_rtt_ms": 69.22531127929688
+      }
+    },
+    "congested": {
+      "64": {
+        "avg_rtt_ms": 60.008060932159424,
+        "min_rtt_ms": 53.41672897338867,
+        "max_rtt_ms": 69.07105445861816
+      },
+      "512": {
+        "avg_rtt_ms": 60.30316352844238,
+        "min_rtt_ms": 53.33375930786133,
+        "max_rtt_ms": 69.2131519317627
+      },
+      "1024": {
+        "avg_rtt_ms": 60.66081523895264,
+        "min_rtt_ms": 51.96547508239746,
+        "max_rtt_ms": 69.2598819732666
+      },
+      "4096": {
+        "avg_rtt_ms": 59.147095680236816,
+        "min_rtt_ms": 50.25339126586914,
+        "max_rtt_ms": 70.43290138244629
+      }
+    }
+  },
+  "scalability_concurrent_flows": {
+    "perfect": {
+      "1": {
+        "target_flows": 1,
+        "successful_flows": 1,
+        "allocation_time_seconds": 0.0026564598083496094,
+        "allocation_time_per_flow_ms": 2.6564598083496094,
+        "data_send_success_rate": 100.0,
+        "bandwidth_per_flow_mbps": 10
+      },
+      "5": {
+        "target_flows": 5,
+        "successful_flows": 5,
+        "allocation_time_seconds": 0.0019259452819824219,
+        "allocation_time_per_flow_ms": 0.3851890563964844,
+        "data_send_success_rate": 100.0,
+        "bandwidth_per_flow_mbps": 10
+      },
+      "10": {
+        "target_flows": 10,
+        "successful_flows": 10,
+        "allocation_time_seconds": 0.0023598670959472656,
+        "allocation_time_per_flow_ms": 0.23598670959472656,
+        "data_send_success_rate": 100.0,
+        "bandwidth_per_flow_mbps": 10
+      },
+      "25": {
+        "target_flows": 25,
+        "successful_flows": 25,
+        "allocation_time_seconds": 0.0010704994201660156,
+        "allocation_time_per_flow_ms": 0.042819976806640625,
+        "data_send_success_rate": 100.0,
+        "bandwidth_per_flow_mbps": 4
+      },
+      "50": {
+        "target_flows": 50,
+        "successful_flows": 50,
+        "allocation_time_seconds": 0.007470369338989258,
+        "allocation_time_per_flow_ms": 0.14940738677978516,
+        "data_send_success_rate": 100.0,
+        "bandwidth_per_flow_mbps": 2
+      }
+    },
+    "lan": {
+      "1": {
+        "target_flows": 1,
+        "successful_flows": 1,
+        "allocation_time_seconds": 0.0008604526519775391,
+        "allocation_time_per_flow_ms": 0.8604526519775391,
+        "data_send_success_rate": 100.0,
+        "bandwidth_per_flow_mbps": 10
+      },
+      "5": {
+        "target_flows": 5,
+        "successful_flows": 5,
+        "allocation_time_seconds": 0.0018274784088134766,
+        "allocation_time_per_flow_ms": 0.3654956817626953,
+        "data_send_success_rate": 100.0,
+        "bandwidth_per_flow_mbps": 10
+      },
+      "10": {
+        "target_flows": 10,
+        "successful_flows": 10,
+        "allocation_time_seconds": 0.0024564266204833984,
+        "allocation_time_per_flow_ms": 0.24564266204833984,
+        "data_send_success_rate": 100.0,
+        "bandwidth_per_flow_mbps": 10
+      },
+      "25": {
+        "target_flows": 25,
+        "successful_flows": 25,
+        "allocation_time_seconds": 0.0039119720458984375,
+        "allocation_time_per_flow_ms": 0.1564788818359375,
+        "data_send_success_rate": 100.0,
+        "bandwidth_per_flow_mbps": 4
+      },
+      "50": {
+        "target_flows": 50,
+        "successful_flows": 50,
+        "allocation_time_seconds": 0.007554531097412109,
+        "allocation_time_per_flow_ms": 0.1510906219482422,
+        "data_send_success_rate": 100.0,
+        "bandwidth_per_flow_mbps": 2
+      }
+    },
+    "wifi": {
+      "1": {
+        "target_flows": 1,
+        "successful_flows": 1,
+        "allocation_time_seconds": 0.0009136199951171875,
+        "allocation_time_per_flow_ms": 0.9136199951171875,
+        "data_send_success_rate": 100.0,
+        "bandwidth_per_flow_mbps": 10
+      },
+      "5": {
+        "target_flows": 5,
+        "successful_flows": 5,
+        "allocation_time_seconds": 0.00188446044921875,
+        "allocation_time_per_flow_ms": 0.37689208984375,
+        "data_send_success_rate": 100.0,
+        "bandwidth_per_flow_mbps": 10
+      },
+      "10": {
+        "target_flows": 10,
+        "successful_flows": 10,
+        "allocation_time_seconds": 0.0008466243743896484,
+        "allocation_time_per_flow_ms": 0.08466243743896484,
+        "data_send_success_rate": 100.0,
+        "bandwidth_per_flow_mbps": 10
+      },
+      "25": {
+        "target_flows": 25,
+        "successful_flows": 25,
+        "allocation_time_seconds": 0.003693819046020508,
+        "allocation_time_per_flow_ms": 0.1477527618408203,
+        "data_send_success_rate": 100.0,
+        "bandwidth_per_flow_mbps": 4
+      },
+      "50": {
+        "target_flows": 50,
+        "successful_flows": 50,
+        "allocation_time_seconds": 0.0024106502532958984,
+        "allocation_time_per_flow_ms": 0.04821300506591797,
+        "data_send_success_rate": 100.0,
+        "bandwidth_per_flow_mbps": 2
+      }
+    }
+  }
+}
