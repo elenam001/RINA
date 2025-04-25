@@ -151,8 +151,8 @@ async def test_hybrid_basic_connectivity(hybrid_net, realistic_network):
 async def test_throughput_hybrid_network(hybrid_net, realistic_network):
     """Test throughput across different realistic network profiles in hybrid mode"""
     results = {}
-    packet_sizes = [64, 512, 1024, 4096]
-    test_duration = 3.0  # seconds
+    packet_sizes = [64, 512, 1024, 4096, 8192]
+    test_duration = 5.0
     dif = await hybrid_net.create_rina_dif("test_dif", layer=0)
     
     for profile_name, profile in network_conditions.NETWORK_PROFILES.items():
@@ -246,7 +246,7 @@ async def test_throughput_hybrid_network(hybrid_net, realistic_network):
 async def test_latency_jitter_hybrid(hybrid_net, realistic_network):
     """Test latency and jitter across different network profiles in hybrid network"""
     results = {}
-    packet_sizes = [64, 512, 1024]
+    packet_sizes = [64, 512, 1024, 4096]
     samples_per_size = 50
     dif = await hybrid_net.create_rina_dif("test_dif", layer=0)
     
@@ -319,8 +319,8 @@ async def test_packet_delivery_ratio_hybrid(hybrid_net, realistic_network):
     results = {}
     
     # Parameters
-    packet_sizes = [64, 1024]
-    packets_per_test = 200
+    packet_sizes = [64, 1024, 4096]
+    packets_per_test = 500
     
     # Create network components
     dif = await hybrid_net.create_rina_dif("test_dif", layer=0)

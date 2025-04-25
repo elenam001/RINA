@@ -294,8 +294,8 @@ async def test_tcp_basic_connectivity(tcp_network):
 async def test_throughput_tcp_network(tcp_network):
     """Test throughput across different realistic network profiles in TCP"""
     results = {}
-    packet_sizes = [64, 512, 1024, 4096]
-    test_duration = 3.0  
+    packet_sizes = [64, 512, 1024, 4096, 8192]
+    test_duration = 5.0  
     
     for profile_name, profile in network_conditions.NETWORK_PROFILES.items():
         print(f"\nTesting throughput on {profile_name} TCP network profile")
@@ -370,7 +370,7 @@ async def test_throughput_tcp_network(tcp_network):
 async def test_latency_jitter_tcp(tcp_network):
     """Test latency and jitter across different network profiles in TCP"""
     results = {}
-    packet_sizes = [64, 512, 1024]
+    packet_sizes = [64, 512, 1024, 4096]
     samples_per_size = 50
     
     for profile_name, profile in network_conditions.NETWORK_PROFILES.items():
@@ -422,8 +422,8 @@ async def test_packet_delivery_ratio_tcp(tcp_network):
     """Test PDR under different network profiles and loads in TCP"""
     results = {}
     
-    packet_sizes = [64, 1024]
-    packets_per_test = 200
+    packet_sizes = [64, 1024, 4096]
+    packets_per_test = 500
     
     for profile_name, profile in network_conditions.NETWORK_PROFILES.items():
         print(f"\nTesting packet delivery ratio on {profile_name} TCP network profile")
