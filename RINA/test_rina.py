@@ -43,38 +43,87 @@ async def measure_flow_metrics(src_ipcp, dst_ipcp, packet_size, packet_count,
     dst_flow = dst_ipcp.flows[flow_id]
     dst_flow.stats["received_packets"] = 0
     
+    # Create a tracking dictionary for packet send times and delivery times
+    packet_tracking = {}
+    ack_received_events = {}
+    
+    # Set up a callback to track packet reception at destination
+    original_receive_data = dst_flow.receive_data
+    
+    async def receive_data_hook(packet):
+        if not isinstance(packet, dict):
+            await original_receive_data(packet)
+            return
+            
+        if not packet.get("is_ack", False):
+            # This is a data packet arriving at destination
+            seq_num = packet.get("seq_num")
+            if seq_num is not None and seq_num in packet_tracking:
+                # Record arrival time for latency calculation
+                packet_tracking[seq_num]["arrival_time"] = time.time()
+        else:
+            # This is an ACK packet arriving back at source
+            ack_seq = packet.get("ack_seq_num")
+            if ack_seq is not None and ack_seq in packet_tracking:
+                # Record ACK receipt time for RTT calculation
+                packet_tracking[ack_seq]["ack_time"] = time.time()
+                # Signal that ACK is received
+                if ack_seq in ack_received_events:
+                    ack_received_events[ack_seq].set()
+        
+        await original_receive_data(packet)
+    
+    # Replace the receive_data method with our hook
+    dst_flow.receive_data = receive_data_hook
+    
     # Send packets and measure
     data = b"x" * packet_size
     last_latency = 0
     
     send_start_time = time.time()
     for i in range(packet_count):
-        packet_send_time = time.time()
+        seq_num = src_flow.sequence_gen.next()
         
-        # Send the packet and capture sequence number
+        # Create tracking entry and event for this packet
+        packet_tracking[seq_num] = {"send_time": time.time()}
+        ack_received_events[seq_num] = asyncio.Event()
+        
+        # Send the packet
         await src_ipcp.send_data(flow_id, data)
         metrics["sent"] += 1
         
+        # Wait for ACK with timeout
+        try:
+            await asyncio.wait_for(ack_received_events[seq_num].wait(), timeout=2.0)
+            
+            # Calculate RTT from send time to ACK receipt
+            if "ack_time" in packet_tracking[seq_num]:
+                rtt = (packet_tracking[seq_num]["ack_time"] - packet_tracking[seq_num]["send_time"]) * 1000  # ms
+                metrics["rtts_ms"].append(rtt)
+            
+            # Calculate one-way latency if we have arrival time
+            if "arrival_time" in packet_tracking[seq_num]:
+                latency = (packet_tracking[seq_num]["arrival_time"] - packet_tracking[seq_num]["send_time"]) * 1000  # ms
+                metrics["latencies_ms"].append(latency)
+                
+                # Calculate jitter only after first packet
+                if i > 0:
+                    jitter = abs(latency - last_latency)
+                    metrics["jitter_ms"].append(jitter)
+                last_latency = latency
+        except asyncio.TimeoutError:
+            # Packet or ACK was lost
+            pass
+            
         # Small delay between packets
         if inter_packet_delay > 0:
             await asyncio.sleep(inter_packet_delay)
-            
-        # Calculate RTT
-        rtt = (time.time() - packet_send_time) * 1000  # ms
-        metrics["rtts_ms"].append(rtt)
-        
-        # Measure one-way latency (note: needs clock sync in real networks)
-        latency = rtt / 2  # Approximation
-        metrics["latencies_ms"].append(latency)
-        
-        # Calculate jitter only after first packet
-        if i > 0:
-            jitter = abs(latency - last_latency)
-            metrics["jitter_ms"].append(jitter)
-        last_latency = latency
     
     send_end_time = time.time()
     await asyncio.sleep(1.0)  # Wait for packets to arrive
+    
+    # Restore original receive_data method
+    dst_flow.receive_data = original_receive_data
     
     # Calculate metrics
     metrics["received"] = dst_flow.stats["received_packets"]
@@ -103,7 +152,6 @@ async def measure_flow_metrics(src_ipcp, dst_ipcp, packet_size, packet_count,
     await src_ipcp.deallocate_flow(flow_id)
     
     return metrics
-
 
 @pytest.mark.asyncio
 async def test_throughput_realistic_networks(network):

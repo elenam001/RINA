@@ -23,7 +23,7 @@ with open('RINA/hybrid_metrics.json', 'r') as f:
 def extract_throughput_data():
     # Initialize dataframes for each network type
     networks = ['perfect', 'lan', 'wifi', 'congested']
-    packet_sizes = [64, 512, 1024, 4096]
+    packet_sizes = [64, 512, 1024, 4096, 8192]
     
     all_data = []
     
@@ -146,7 +146,7 @@ def extract_pdr_data():
     
     # Extract TCP data
     for network in networks:
-        for size in [64, 1024]:  # TCP only has 64 and 1024
+        for size in [64, 1024, 4096]:  # TCP only has 64 and 1024
             if str(size) in tcp_data['packet_delivery_ratio_tcp'][network]:
                 row = {
                     'Protocol': 'TCP',
@@ -174,7 +174,7 @@ def extract_pdr_data():
     
     # Extract Hybrid data
     for network in networks:
-        for size in [64, 1024]:  # Hybrid only has 64 and 1024
+        for size in [64, 1024, 4096]:  # Hybrid only has 64 and 1024
             if str(size) in hybrid_data['packet_delivery_ratio_hybrid'][network]:
                 row = {
                     'Protocol': 'Hybrid',
@@ -196,7 +196,7 @@ def extract_pdr_data():
 
 # 4. CONCURRENT CONNECTIONS/FLOWS
 def extract_concurrent_data():
-    connection_counts = [1, 5, 10, 25, 50]  # 50 only in RINA
+    connection_counts = [1, 5, 10, 25]  # 50 only in RINA
     
     all_data = []
     
@@ -247,13 +247,57 @@ def extract_concurrent_data():
 
 # 1. Throughput comparison across protocols and networks
 def plot_throughput_comparison(df):
+    # Get unique network profiles
+    networks = df['Network'].unique()
+    
+    # Create a separate chart for each network profile
+    for network in networks:
+        # Filter data for this network
+        network_df = df[df['Network'] == network]
+        
+        # Create figure
+        plt.figure(figsize=(10, 6))
+        
+        # Create bar chart
+        sns.barplot(x='Packet_Size', y='Throughput_Mbps', hue='Protocol', 
+                   data=network_df, errorbar=None, palette='viridis')
+        
+        # Add titles and labels
+        plt.title(f'Throughput Comparison - {network.capitalize()} Network')
+        plt.xlabel('Packet Size (bytes)')
+        plt.ylabel('Throughput (Mbps)')
+        plt.legend(title='Protocol')
+        
+        # Save the figure
+        plt.tight_layout()
+        plt.savefig(f'charts/throughput_{network}_network.png', dpi=300)
+        plt.close()
+        
+        # Create log scale version for better visibility of small values
+        plt.figure(figsize=(10, 6))
+        
+        # Create bar chart
+        ax = sns.barplot(x='Packet_Size', y='Throughput_Mbps', hue='Protocol', 
+                       data=network_df, errorbar=None, palette='viridis')
+        
+        # Set y-axis to log scale
+        ax.set_yscale('log')
+        
+        # Add titles and labels
+        plt.title(f'Throughput Comparison - {network.capitalize()} Network (Log Scale)')
+        plt.xlabel('Packet Size (bytes)')
+        plt.ylabel('Throughput (Mbps) - Log Scale')
+        plt.legend(title='Protocol')
+        
+        # Save the figure
+        plt.tight_layout()
+        plt.savefig(f'charts/throughput_{network}_network_log.png', dpi=300)
+        plt.close()
+    
+    # Also create a consolidated view with all networks in one figure
     plt.figure(figsize=(16, 10))
     
-    # Create a grouped bar chart
-    ax = sns.barplot(x='Packet_Size', y='Throughput_Mbps', hue='Protocol', 
-                    data=df, errorbar=None, palette='viridis')
-    
-    # Separate into facets by network type
+    # Create facet grid with one chart per network
     g = sns.FacetGrid(df, col='Network', height=5, aspect=1.2)
     g.map_dataframe(sns.barplot, x='Packet_Size', y='Throughput_Mbps', 
                    hue='Protocol', errorbar=None, palette='viridis')
@@ -265,23 +309,8 @@ def plot_throughput_comparison(df):
     
     # Save the figure
     plt.tight_layout()
-    plt.savefig('charts/throughput_comparison.png', dpi=300)
-    
-    # Log scale version for better visibility of small values
-    g = sns.FacetGrid(df, col='Network', height=5, aspect=1.2)
-    g.map_dataframe(sns.barplot, x='Packet_Size', y='Throughput_Mbps', 
-                   hue='Protocol', errorbar=None, palette='viridis')
-    
-    # Set y-axis to log scale
-    for ax in g.axes.flat:
-        ax.set_yscale('log')
-    
-    g.set_axis_labels('Packet Size (bytes)', 'Throughput (Mbps) - Log Scale')
-    g.set_titles(col_template='{col_name} Network')
-    g.add_legend(title='Protocol')
-    
-    plt.tight_layout()
-    plt.savefig('charts/throughput_comparison_log.png', dpi=300)
+    plt.savefig('charts/throughput_all_networks.png', dpi=300)
+    plt.close()
 
 # 2. Latency comparison
 def plot_latency_comparison(df):
@@ -320,6 +349,116 @@ def plot_latency_comparison(df):
     
     plt.tight_layout()
     plt.savefig('charts/jitter_comparison.png', dpi=300)
+
+def plot_jitter_comparison(df):
+    plt.figure(figsize=(16, 8))
+    g = sns.FacetGrid(df, col='Network', height=6, aspect=1.2)
+    g.map_dataframe(sns.barplot, x='Packet_Size', y='Avg_Jitter_ms', 
+                   hue='Protocol', errorbar=None, palette='Set2')
+    
+    g.set_axis_labels('Packet Size (bytes)', 'Average Jitter (ms)')
+    g.set_titles(col_template='{col_name} Network')
+    g.add_legend(title='Protocol')
+    
+    # Improve readability
+    for ax in g.axes.flat:
+        ax.grid(True, linestyle='--', alpha=0.6)
+        for label in ax.get_xticklabels():
+            label.set_rotation(45)
+    
+    plt.tight_layout()
+    plt.savefig('charts/jitter_by_network_packetsize.png', dpi=300)
+    
+    # 2. Protocol-focused jitter comparison
+    plt.figure(figsize=(16, 8))
+    g = sns.FacetGrid(df, col='Protocol', height=6, aspect=1.2)
+    g.map_dataframe(sns.barplot, x='Network', y='Avg_Jitter_ms', 
+                   hue='Packet_Size', errorbar=None, palette='viridis')
+    
+    g.set_axis_labels('Network Type', 'Average Jitter (ms)')
+    g.set_titles(col_template='{col_name} Protocol')
+    g.add_legend(title='Packet Size (bytes)')
+    
+    # Improve readability
+    for ax in g.axes.flat:
+        ax.grid(True, linestyle='--', alpha=0.6)
+    
+    plt.tight_layout()
+    plt.savefig('charts/jitter_by_protocol_network.png', dpi=300)
+    
+    # 3. Heatmap visualization for jitter comparison
+    pivot_df = df.pivot_table(
+        index=['Protocol', 'Packet_Size'], 
+        columns='Network', 
+        values='Avg_Jitter_ms'
+    )
+    
+    plt.figure(figsize=(12, 10))
+    sns.heatmap(pivot_df, annot=True, cmap='YlGnBu', fmt='.2f', linewidths=.5)
+    plt.title('Average Jitter (ms) Across Networks, Protocols and Packet Sizes')
+    plt.tight_layout()
+    plt.savefig('charts/jitter_heatmap.png', dpi=300)
+    
+    # 4. Box plot to show jitter distribution and variability
+    plt.figure(figsize=(18, 10))
+    g = sns.FacetGrid(df, col='Network', row='Protocol', height=4, aspect=1.3)
+    g.map_dataframe(sns.boxplot, x='Packet_Size', y='Avg_Jitter_ms', palette='Set3')
+    
+    g.set_axis_labels('Packet Size (bytes)', 'Average Jitter (ms)')
+    g.set_titles(col_template='{col_name} Network', row_template='{row_name}')
+    
+    # Improve readability
+    for ax in g.axes.flat:
+        if ax is not None:
+            ax.grid(True, linestyle='--', alpha=0.6)
+            for label in ax.get_xticklabels():
+                label.set_rotation(45)
+    
+    plt.tight_layout()
+    plt.savefig('charts/jitter_boxplot_by_protocol_network.png', dpi=300)
+    
+    # 5. Line plot showing jitter trends
+    plt.figure(figsize=(14, 8))
+    sns.lineplot(data=df, x='Packet_Size', y='Avg_Jitter_ms', 
+                 hue='Protocol', style='Network', markers=True, 
+                 linewidth=2.5, palette='Dark2')
+    
+    plt.title('Jitter Trends Across Packet Sizes')
+    plt.xlabel('Packet Size (bytes)')
+    plt.ylabel('Average Jitter (ms)')
+    plt.grid(True, linestyle='--', alpha=0.7)
+    plt.legend(title='', bbox_to_anchor=(1.05, 1), loc='upper left')
+    plt.tight_layout()
+    plt.savefig('charts/jitter_trends_line.png', dpi=300)
+
+    # 6. Violin plot for jitter distribution
+    plt.figure(figsize=(16, 10))
+    sns.violinplot(data=df, x='Protocol', y='Avg_Jitter_ms', 
+                  hue='Network', split=True, palette='Set1')
+    
+    plt.title('Jitter Distribution by Protocol and Network')
+    plt.xlabel('Protocol')
+    plt.ylabel('Average Jitter (ms)')
+    plt.grid(True, linestyle='--', alpha=0.6)
+    plt.legend(title='Network Type')
+    plt.tight_layout()
+    plt.savefig('charts/jitter_violin_plot.png', dpi=300)
+    
+    # 7. Correlation between jitter and latency
+    plt.figure(figsize=(10, 8))
+    sns.scatterplot(data=df, x='Avg_Latency_ms', y='Avg_Jitter_ms', 
+                   hue='Protocol', style='Network', size='Packet_Size',
+                   sizes=(50, 200), alpha=0.7)
+    
+    plt.title('Correlation Between Latency and Jitter')
+    plt.xlabel('Average Latency (ms)')
+    plt.ylabel('Average Jitter (ms)')
+    plt.grid(True, linestyle='--', alpha=0.6)
+    plt.legend(title='', bbox_to_anchor=(1.05, 1), loc='upper left')
+    plt.tight_layout()
+    plt.savefig('charts/jitter_latency_correlation.png', dpi=300)
+
+    print("jitter visualization charts created successfully!")
 
 # 3. Packet Delivery Ratio comparison
 def plot_pdr_comparison(df):
@@ -430,6 +569,7 @@ concurrent_df = extract_concurrent_data()
 # Generate visualizations
 plot_throughput_comparison(throughput_df)
 plot_latency_comparison(latency_df)
+plot_jitter_comparison(latency_df)
 plot_pdr_comparison(pdr_df)
 plot_concurrent_comparison(concurrent_df)
 

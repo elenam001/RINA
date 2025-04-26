@@ -2,288 +2,288 @@
   "throughput_realistic_networks": {
     "perfect": {
       "64": {
-        "throughput_mbps": 0.9783079444485908,
-        "packets_sent": 10523,
-        "packets_per_second": 1910.757704001154,
-        "bytes_sent": 673472,
-        "elapsed_seconds": 5.50723934173584
+        "throughput_mbps": 0.8830540925588012,
+        "packets_sent": 9510,
+        "packets_per_second": 1724.7150245289085,
+        "bytes_sent": 608640,
+        "elapsed_seconds": 5.513954401016235
       },
       "512": {
-        "throughput_mbps": 3.6802266657843457,
-        "packets_sent": 4949,
-        "packets_per_second": 898.4928383262562,
-        "bytes_sent": 2533888,
-        "elapsed_seconds": 5.508112907409668
+        "throughput_mbps": 8.078382300323442,
+        "packets_sent": 10862,
+        "packets_per_second": 1972.261303789903,
+        "bytes_sent": 5561344,
+        "elapsed_seconds": 5.507383823394775
       },
       "1024": {
-        "throughput_mbps": 17.615991045930496,
-        "packets_sent": 11841,
-        "packets_per_second": 2150.3895319739377,
-        "bytes_sent": 12125184,
-        "elapsed_seconds": 5.506444215774536
+        "throughput_mbps": 18.151989556749616,
+        "packets_sent": 12197,
+        "packets_per_second": 2215.819037689162,
+        "bytes_sent": 12489728,
+        "elapsed_seconds": 5.504510879516602
       },
       "4096": {
-        "throughput_mbps": 79.45381447374264,
-        "packets_sent": 13346,
-        "packets_per_second": 2424.7379905316966,
-        "bytes_sent": 54665216,
-        "elapsed_seconds": 5.5040998458862305
+        "throughput_mbps": 68.63625980884254,
+        "packets_sent": 11533,
+        "packets_per_second": 2094.61242092415,
+        "bytes_sent": 47239168,
+        "elapsed_seconds": 5.506030559539795
       },
       "8192": {
-        "throughput_mbps": 155.24967910853292,
-        "packets_sent": 13052,
-        "packets_per_second": 2368.9221055379167,
-        "bytes_sent": 106921984,
-        "elapsed_seconds": 5.509678840637207
+        "throughput_mbps": 127.18791457868308,
+        "packets_sent": 10688,
+        "packets_per_second": 1940.7335598553937,
+        "bytes_sent": 87556096,
+        "elapsed_seconds": 5.507195949554443
       }
     },
     "lan": {
       "64": {
-        "throughput_mbps": 31.588511310613562,
-        "packets_sent": 339721,
-        "packets_per_second": 61696.31115354211,
-        "bytes_sent": 21742144,
-        "elapsed_seconds": 5.506342172622681
+        "throughput_mbps": 31.229207819577777,
+        "packets_sent": 335792,
+        "packets_per_second": 60994.54652261284,
+        "bytes_sent": 21490688,
+        "elapsed_seconds": 5.505279064178467
       },
       "512": {
-        "throughput_mbps": 63.100745065701496,
-        "packets_sent": 84884,
-        "packets_per_second": 15405.45533830603,
-        "bytes_sent": 43460608,
-        "elapsed_seconds": 5.509996175765991
+        "throughput_mbps": 62.1316375224498,
+        "packets_sent": 83627,
+        "packets_per_second": 15168.856817004345,
+        "bytes_sent": 42817024,
+        "elapsed_seconds": 5.5130720138549805
       },
       "1024": {
-        "throughput_mbps": 52.79433927980855,
-        "packets_sent": 35489,
-        "packets_per_second": 6444.621494117254,
-        "bytes_sent": 36340736,
-        "elapsed_seconds": 5.506762504577637
+        "throughput_mbps": 54.44210018843952,
+        "packets_sent": 36661,
+        "packets_per_second": 6645.764183159121,
+        "bytes_sent": 37540864,
+        "elapsed_seconds": 5.516446113586426
       },
       "4096": {
-        "throughput_mbps": 5.142140082139651,
-        "packets_sent": 864,
-        "packets_per_second": 156.92566168639073,
-        "bytes_sent": 3538944,
-        "elapsed_seconds": 5.505791664123535
+        "throughput_mbps": 5.404770842581365,
+        "packets_sent": 908,
+        "packets_per_second": 164.9405164361989,
+        "bytes_sent": 3719168,
+        "elapsed_seconds": 5.505014896392822
       },
       "8192": {
-        "throughput_mbps": 7.93315973079566,
-        "packets_sent": 667,
-        "packets_per_second": 121.05041093133026,
-        "bytes_sent": 5464064,
-        "elapsed_seconds": 5.510101079940796
+        "throughput_mbps": 8.458854323503273,
+        "packets_sent": 711,
+        "packets_per_second": 129.07187383275257,
+        "bytes_sent": 5824512,
+        "elapsed_seconds": 5.508558750152588
       }
     },
     "wifi": {
       "64": {
-        "throughput_mbps": 6.752949926150485,
-        "packets_sent": 72610,
-        "packets_per_second": 13189.355324512668,
-        "bytes_sent": 4647040,
-        "elapsed_seconds": 5.505197048187256
+        "throughput_mbps": 6.036455303678496,
+        "packets_sent": 64895,
+        "packets_per_second": 11789.951764997062,
+        "bytes_sent": 4153280,
+        "elapsed_seconds": 5.504263401031494
       },
       "512": {
-        "throughput_mbps": 0.5109072841634205,
-        "packets_sent": 689,
-        "packets_per_second": 124.73322367271008,
-        "bytes_sent": 352768,
-        "elapsed_seconds": 5.523788928985596
+        "throughput_mbps": 0.5622511891190124,
+        "packets_sent": 756,
+        "packets_per_second": 137.2683567185089,
+        "bytes_sent": 387072,
+        "elapsed_seconds": 5.507460117340088
       },
       "1024": {
-        "throughput_mbps": 0.975582523239803,
-        "packets_sent": 656,
-        "packets_per_second": 119.08966348142127,
-        "bytes_sent": 671744,
-        "elapsed_seconds": 5.5084545612335205
+        "throughput_mbps": 1.0430129748619088,
+        "packets_sent": 701,
+        "packets_per_second": 127.32091978294784,
+        "bytes_sent": 717824,
+        "elapsed_seconds": 5.505772352218628
       },
       "4096": {
-        "throughput_mbps": 3.647319490141835,
-        "packets_sent": 613,
-        "packets_per_second": 111.30735748723862,
-        "bytes_sent": 2510848,
-        "elapsed_seconds": 5.507272958755493
+        "throughput_mbps": 3.7673422371281218,
+        "packets_sent": 633,
+        "packets_per_second": 114.97016104516973,
+        "bytes_sent": 2592768,
+        "elapsed_seconds": 5.505776405334473
       },
       "8192": {
-        "throughput_mbps": 4.152216271861287,
-        "packets_sent": 349,
-        "packets_per_second": 63.35779223421154,
-        "bytes_sent": 2859008,
-        "elapsed_seconds": 5.50839900970459
+        "throughput_mbps": 4.94977252483275,
+        "packets_sent": 416,
+        "packets_per_second": 75.52753486378097,
+        "bytes_sent": 3407872,
+        "elapsed_seconds": 5.507925033569336
       }
     },
     "congested": {
       "64": {
-        "throughput_mbps": 0.06154683865379311,
-        "packets_sent": 662,
-        "packets_per_second": 120.20866924568968,
-        "bytes_sent": 42368,
-        "elapsed_seconds": 5.507090330123901
+        "throughput_mbps": 0.06641493720252384,
+        "packets_sent": 714,
+        "packets_per_second": 129.71667422367938,
+        "bytes_sent": 45696,
+        "elapsed_seconds": 5.504303932189941
       },
       "512": {
-        "throughput_mbps": 0.2803546779659065,
-        "packets_sent": 377,
-        "packets_per_second": 68.44596630027016,
-        "bytes_sent": 193024,
-        "elapsed_seconds": 5.5079944133758545
+        "throughput_mbps": 0.33106253764781896,
+        "packets_sent": 445,
+        "packets_per_second": 80.82581485542454,
+        "bytes_sent": 227840,
+        "elapsed_seconds": 5.505666732788086
       },
       "1024": {
-        "throughput_mbps": 0.48945000354052126,
-        "packets_sent": 329,
-        "packets_per_second": 59.74731488531754,
-        "bytes_sent": 336896,
-        "elapsed_seconds": 5.506523609161377
+        "throughput_mbps": 0.5204938067344084,
+        "packets_sent": 350,
+        "packets_per_second": 63.53684164238384,
+        "bytes_sent": 358400,
+        "elapsed_seconds": 5.508615016937256
       },
       "4096": {
-        "throughput_mbps": 1.8984066676917817,
-        "packets_sent": 319,
-        "packets_per_second": 57.93477379430486,
-        "bytes_sent": 1306624,
-        "elapsed_seconds": 5.506192207336426
+        "throughput_mbps": 1.9280810261500267,
+        "packets_sent": 324,
+        "packets_per_second": 58.840363346863604,
+        "bytes_sent": 1327104,
+        "elapsed_seconds": 5.506424188613892
       },
       "8192": {
-        "throughput_mbps": 3.7941852117012247,
-        "packets_sent": 319,
-        "packets_per_second": 57.89467180940589,
-        "bytes_sent": 2613248,
-        "elapsed_seconds": 5.5100061893463135
+        "throughput_mbps": 3.771901691997415,
+        "packets_sent": 317,
+        "packets_per_second": 57.5546522826754,
+        "bytes_sent": 2596864,
+        "elapsed_seconds": 5.507808446884155
       }
     }
   },
   "latency_jitter_realistic": {
     "perfect": {
       "64": {
-        "avg_latency_ms": 31.338776350021362,
-        "min_latency_ms": 25.6960391998291,
-        "max_latency_ms": 33.132314682006836,
-        "avg_jitter_ms": 0.3917494205513386,
-        "max_jitter_ms": 6.4716339111328125,
-        "avg_rtt_ms": 62.677552700042725
+        "avg_latency_ms": 0.22413015365600586,
+        "min_latency_ms": 0.07390975952148438,
+        "max_latency_ms": 0.9295940399169922,
+        "avg_jitter_ms": 0.10433341517592921,
+        "max_jitter_ms": 0.7441043853759766,
+        "avg_rtt_ms": 0.23577451705932617
       },
       "512": {
-        "avg_latency_ms": 31.3723361492157,
-        "min_latency_ms": 30.62915802001953,
-        "max_latency_ms": 32.57584571838379,
-        "avg_jitter_ms": 0.2716912163628472,
-        "max_jitter_ms": 1.3725757598876953,
-        "avg_rtt_ms": 62.7446722984314
+        "avg_latency_ms": 0.2573680877685547,
+        "min_latency_ms": 0.06985664367675781,
+        "max_latency_ms": 1.0669231414794922,
+        "avg_jitter_ms": 0.10568445379083807,
+        "max_jitter_ms": 0.7688999176025391,
+        "avg_rtt_ms": 0.2695631980895996
       },
       "1024": {
-        "avg_latency_ms": 31.293855905532837,
-        "min_latency_ms": 25.72941780090332,
-        "max_latency_ms": 32.67252445220947,
-        "avg_jitter_ms": 0.38355408292828186,
-        "max_jitter_ms": 5.5370330810546875,
-        "avg_rtt_ms": 62.587711811065674
+        "avg_latency_ms": 0.23941993713378906,
+        "min_latency_ms": 0.06699562072753906,
+        "max_latency_ms": 0.6449222564697266,
+        "avg_jitter_ms": 0.08461692116477272,
+        "max_jitter_ms": 0.43654441833496094,
+        "avg_rtt_ms": 0.25235891342163086
       },
       "4096": {
-        "avg_latency_ms": 31.373305320739746,
-        "min_latency_ms": 30.41696548461914,
-        "max_latency_ms": 32.59432315826416,
-        "avg_jitter_ms": 0.25723558483701764,
-        "max_jitter_ms": 1.3899803161621094,
-        "avg_rtt_ms": 62.74661064147949
+        "avg_latency_ms": 0.28213024139404297,
+        "min_latency_ms": 0.06866455078125,
+        "max_latency_ms": 1.4579296112060547,
+        "avg_jitter_ms": 0.14502592761107166,
+        "max_jitter_ms": 1.3642311096191406,
+        "avg_rtt_ms": 0.295562744140625
       }
     },
     "lan": {
       "64": {
-        "avg_latency_ms": 31.121342182159424,
-        "min_latency_ms": 25.353074073791504,
-        "max_latency_ms": 32.51755237579346,
-        "avg_jitter_ms": 0.5456618588380139,
-        "max_jitter_ms": 5.8841705322265625,
-        "avg_rtt_ms": 62.24268436431885
+        "avg_latency_ms": 15.559184551239014,
+        "min_latency_ms": 4.52876091003418,
+        "max_latency_ms": 17.64988899230957,
+        "avg_jitter_ms": 0.5454439105409564,
+        "max_jitter_ms": 11.565685272216797,
+        "avg_rtt_ms": 15.576598644256592
       },
       "512": {
-        "avg_latency_ms": 31.374354362487793,
-        "min_latency_ms": 30.36665916442871,
-        "max_latency_ms": 32.686591148376465,
-        "avg_jitter_ms": 0.292764769660102,
-        "max_jitter_ms": 1.4778375625610352,
-        "avg_rtt_ms": 62.748708724975586
+        "avg_latency_ms": 15.054738521575928,
+        "min_latency_ms": 2.475738525390625,
+        "max_latency_ms": 17.207622528076172,
+        "avg_jitter_ms": 1.2526271319148516,
+        "max_jitter_ms": 13.84425163269043,
+        "avg_rtt_ms": 15.0738525390625
       },
       "1024": {
-        "avg_latency_ms": 31.31833553314209,
-        "min_latency_ms": 26.503324508666992,
-        "max_latency_ms": 32.677531242370605,
-        "avg_jitter_ms": 0.35964599763504185,
-        "max_jitter_ms": 4.850983619689941,
-        "avg_rtt_ms": 62.63667106628418
+        "avg_latency_ms": 14.767353875296456,
+        "min_latency_ms": 2.4340152740478516,
+        "max_latency_ms": 17.163515090942383,
+        "avg_jitter_ms": 2.167077625499052,
+        "max_jitter_ms": 13.370275497436523,
+        "avg_rtt_ms": 14.784247534615654
       },
       "4096": {
-        "avg_latency_ms": 31.37538194656372,
-        "min_latency_ms": 30.433058738708496,
-        "max_latency_ms": 32.53781795501709,
-        "avg_jitter_ms": 0.2688109272658223,
-        "max_jitter_ms": 1.349806785583496,
-        "avg_rtt_ms": 62.75076389312744
+        "avg_latency_ms": 15.419931411743164,
+        "min_latency_ms": 2.0110607147216797,
+        "max_latency_ms": 27.227163314819336,
+        "avg_jitter_ms": 1.4408284967595881,
+        "max_jitter_ms": 14.759302139282227,
+        "avg_rtt_ms": 15.441482067108154
       }
     },
     "wifi": {
       "64": {
-        "avg_latency_ms": 31.371209621429443,
-        "min_latency_ms": 31.015872955322266,
-        "max_latency_ms": 32.4862003326416,
-        "avg_jitter_ms": 0.2510740299417515,
-        "max_jitter_ms": 1.2334585189819336,
-        "avg_rtt_ms": 62.74241924285889
+        "avg_latency_ms": 15.179102237407978,
+        "min_latency_ms": 3.997325897216797,
+        "max_latency_ms": 28.666973114013672,
+        "avg_jitter_ms": 3.9478143056233725,
+        "max_jitter_ms": 13.34691047668457,
+        "avg_rtt_ms": 15.198249083298903
       },
       "512": {
-        "avg_latency_ms": 31.2278413772583,
-        "min_latency_ms": 25.190353393554688,
-        "max_latency_ms": 32.63425827026367,
-        "avg_jitter_ms": 0.4988294659238873,
-        "max_jitter_ms": 6.0710906982421875,
-        "avg_rtt_ms": 62.4556827545166
+        "avg_latency_ms": 15.629057884216309,
+        "min_latency_ms": 8.584022521972656,
+        "max_latency_ms": 19.199848175048828,
+        "avg_jitter_ms": 0.6230840779314137,
+        "max_jitter_ms": 7.0953369140625,
+        "avg_rtt_ms": 15.646193027496338
       },
       "1024": {
-        "avg_latency_ms": 31.29409432411194,
-        "min_latency_ms": 26.230335235595703,
-        "max_latency_ms": 32.719969749450684,
-        "avg_jitter_ms": 0.39609152861315794,
-        "max_jitter_ms": 5.1757097244262695,
-        "avg_rtt_ms": 62.58818864822388
+        "avg_latency_ms": 15.438079833984375,
+        "min_latency_ms": 7.533073425292969,
+        "max_latency_ms": 18.184423446655273,
+        "avg_jitter_ms": 2.3160491670881,
+        "max_jitter_ms": 10.380983352661133,
+        "avg_rtt_ms": 15.453529357910156
       },
       "4096": {
-        "avg_latency_ms": 31.284377574920654,
-        "min_latency_ms": 26.186108589172363,
-        "max_latency_ms": 33.870577812194824,
-        "avg_jitter_ms": 0.4809239898065124,
-        "max_jitter_ms": 5.246758460998535,
-        "avg_rtt_ms": 62.56875514984131
+        "avg_latency_ms": 15.705761909484863,
+        "min_latency_ms": 13.518333435058594,
+        "max_latency_ms": 18.40376853942871,
+        "avg_jitter_ms": 0.4632015420932962,
+        "max_jitter_ms": 3.613710403442383,
+        "avg_rtt_ms": 15.722262859344482
       }
     },
     "congested": {
       "64": {
-        "avg_latency_ms": 31.379024982452393,
-        "min_latency_ms": 30.91728687286377,
-        "max_latency_ms": 32.60982036590576,
-        "avg_jitter_ms": 0.2998624529157366,
-        "max_jitter_ms": 1.3933181762695312,
-        "avg_rtt_ms": 62.758049964904785
+        "avg_latency_ms": 87.9892110824585,
+        "min_latency_ms": 78.5982608795166,
+        "max_latency_ms": 97.38016128540039,
+        "avg_jitter_ms": 18.78190040588379,
+        "max_jitter_ms": 18.78190040588379,
+        "avg_rtt_ms": 88.00077438354492
       },
       "512": {
-        "avg_latency_ms": 31.38005018234253,
-        "min_latency_ms": 30.83515167236328,
-        "max_latency_ms": 32.78052806854248,
-        "avg_jitter_ms": 0.3083068497326909,
-        "max_jitter_ms": 1.5364885330200195,
-        "avg_rtt_ms": 62.76010036468506
+        "avg_latency_ms": 115.56802272796631,
+        "min_latency_ms": 77.84414291381836,
+        "max_latency_ms": 156.2972068786621,
+        "avg_jitter_ms": 23.621914338092413,
+        "max_jitter_ms": 77.96311378479004,
+        "avg_rtt_ms": 115.58579921722412
       },
       "1024": {
-        "avg_latency_ms": 31.37260913848877,
-        "min_latency_ms": 30.567169189453125,
-        "max_latency_ms": 32.65392780303955,
-        "avg_jitter_ms": 0.3036625531254982,
-        "max_jitter_ms": 1.44195556640625,
-        "avg_rtt_ms": 62.74521827697754
+        "avg_latency_ms": 111.58421635627747,
+        "min_latency_ms": 65.79756736755371,
+        "max_latency_ms": 148.8804817199707,
+        "avg_jitter_ms": 29.011917114257812,
+        "max_jitter_ms": 83.08291435241699,
+        "avg_rtt_ms": 111.5986555814743
       },
       "4096": {
-        "avg_latency_ms": 31.36929988861084,
-        "min_latency_ms": 31.02290630340576,
-        "max_latency_ms": 32.52887725830078,
-        "avg_jitter_ms": 0.2597083850782745,
-        "max_jitter_ms": 1.4078617095947266,
-        "avg_rtt_ms": 62.73859977722168
+        "avg_latency_ms": 122.32904434204102,
+        "min_latency_ms": 87.1894359588623,
+        "max_latency_ms": 149.72662925720215,
+        "avg_jitter_ms": 48.6183762550354,
+        "max_jitter_ms": 53.52044105529785,
+        "avg_rtt_ms": 122.35360145568848
       }
     }
   },
