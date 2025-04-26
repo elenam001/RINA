@@ -35,7 +35,6 @@ class TCPIPAdapter:
         )
         logging.info(f"TCP/IP Adapter listening on {self.host}:{self.port}")
         
-        # Start serving in a background task without awaiting it
         asyncio.create_task(self._serve_forever())
 
     async def _serve_forever(self):
@@ -62,7 +61,6 @@ class TCPIPAdapter:
         logging.info(f"TCP Connection from {connection_id}")
         
         if self.rina_ipcp:
-            # Allocate RINA flow and bridge
             try:
                 flow_id = await self.allocate_rina_flow(connection_id)
                 if flow_id:
@@ -78,7 +76,6 @@ class TCPIPAdapter:
                     del self.connections[connection_id]
         else:
             try:
-                # Add timeout to prevent hanging on read
                 while True:
                     try:
                         data = await asyncio.wait_for(reader.read(4096), timeout=2.0)
@@ -87,11 +84,9 @@ class TCPIPAdapter:
                         self.stats['received_packets'] += 1
                         self.stats['bytes_received'] += len(data)
                         
-                        # Apply network conditions if they exist
                         if self.network_conditions:
                             await self.network_conditions.process_packet(data, writer)
                         else:
-                            # Echo it back for simple testing
                             writer.write(data)
                             await writer.drain()
                         
@@ -116,13 +111,11 @@ class TCPIPAdapter:
         if not self.rina_ipcp:
             return None
         
-        # Find a destination IPCP in the RINA network
         dest_ipcp = next(iter(self.rina_ipcp.neighbors), None)
         if not dest_ipcp:
             logging.error("No destination IPCP available in RINA network")
             return None
         
-        # Allocate flow to the destination IPCP
         try:
             flow_id = await self.rina_ipcp.allocate_flow(dest_ipcp, port=5000, qos=qos)
             if flow_id:
@@ -137,21 +130,17 @@ class TCPIPAdapter:
     
     async def tcp_to_rina_bridge(self, connection_id, flow_id, reader, writer):
         """Bridge data between TCP and RINA networks"""
-        # Start two tasks: TCP → RINA and RINA → TCP
         tcp_to_rina = asyncio.create_task(self._forward_tcp_to_rina(connection_id, flow_id, reader))
         rina_to_tcp = asyncio.create_task(self._forward_rina_to_tcp(connection_id, flow_id, writer))
         
-        # Wait for either task to complete (connection closed or error)
         done, pending = await asyncio.wait(
             [tcp_to_rina, rina_to_tcp],
             return_when=asyncio.FIRST_COMPLETED
         )
         
-        # Cancel the other task
         for task in pending:
             task.cancel()
         
-        # Wait for cancellation to complete
         try:
             await asyncio.gather(*pending, return_exceptions=True)
         except asyncio.CancelledError:
@@ -180,13 +169,10 @@ class TCPIPAdapter:
             logging.error(f"No flow object found for ID {flow_id}")
             return
         
-        # Register a callback to be notified when data arrives on this flow
         flow.tcp_adapter_queue = asyncio.Queue()
         
-        # Original receive_data method to store for restoration
         original_receive_data = flow.receive_data
         
-        # Override receive_data to capture data for TCP
         async def intercept_receive_data(packet):
             await original_receive_data(packet)
             if not isinstance(packet, dict) or not packet.get("is_ack", False):
@@ -205,7 +191,6 @@ class TCPIPAdapter:
                     if not data:
                         continue
                     
-                    # Apply network conditions if set
                     if self.network_conditions:
                         await self.network_conditions.process_packet(data, writer)
                     else:
@@ -216,7 +201,6 @@ class TCPIPAdapter:
                     self.stats['bytes_sent'] += len(data)
                     logging.debug(f"RINA→TCP: {len(data)} bytes from flow {flow_id} to {connection_id}")
                 except asyncio.TimeoutError:
-                    # Just check if the connection is still alive
                     if writer.is_closing():
                         break
                 except Exception as e:
@@ -284,7 +268,6 @@ class RINATCPApplication(Application):
         """Override to handle data from RINA that might go to TCP"""
         await super().on_data(data)
         
-        # If we're connected to TCP endpoints, we could forward the data
         for conn_id, (reader, writer) in self.tcp_connections.items():
             try:
                 writer.write(data)
@@ -391,7 +374,7 @@ class HybridNetwork:
         """Start all TCP adapters"""
         for name, adapter in self.tcp_adapters.items():
             await adapter.start_server()
-            logging.info(f"Started TCP adapter: {name}")  # Add logging
+            logging.info(f"Started TCP adapter: {name}") 
     
     async def create_hybrid_application(self, name, ipcp, adapter_name=None):
         """Create an application that can work with both RINA and TCP/IP"""
@@ -407,17 +390,14 @@ class HybridNetwork:
         """Shutdown the entire hybrid network"""
         logging.info("Starting hybrid network shutdown...")
         
-        # Close all RINA apps TCP connections
         for name, app in self.rina_apps.items():
             logging.info(f"Closing TCP connections for RINA app: {name}")
             await app.close_all_tcp()
         
-        # Close all TCP adapters
         for name, adapter in self.tcp_adapters.items():
             logging.info(f"Closing TCP adapter: {name}")
             await adapter.close()
         
-        # Clean up RINA flows
         for name, dif in self.rina_difs.items():
             logging.info(f"Cleaning up DIF: {name}")
             for ipcp in dif.get_ipcps():

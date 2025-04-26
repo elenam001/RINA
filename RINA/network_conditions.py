@@ -63,7 +63,7 @@ class NetworkConditions:
                     pos = random.randrange(len(packet))
                     corrupt_byte = packet[pos] ^ random.randint(1, 255)
                     packet = packet[:pos] + bytes([corrupt_byte]) + packet[pos+1:]
-            latency = self.latency_ms / 1000  # Convert to seconds
+            latency = self.latency_ms / 1000 
             if self.jitter_ms > 0:
                 jitter = random.uniform(-self.jitter_ms/1000, self.jitter_ms/1000)
                 latency += jitter
@@ -177,7 +177,6 @@ class TCPNetworkConditions(NetworkConditions):
                  reordering_rate=0):
         super().__init__(latency_ms, jitter_ms, packet_loss_rate, 
                          bandwidth_mbps, corruption_rate, reordering_rate)
-        # Queue for TCP packets specifically
         self.tcp_queue = asyncio.Queue()
         self.tcp_processing_task = None
     
@@ -205,7 +204,6 @@ class TCPNetworkConditions(NetworkConditions):
         while True:
             data, writer, _ = await self.tcp_queue.get()
             
-            # Apply bandwidth limitation if specified
             if self.bandwidth_mbps:
                 packet_size_bits = len(data) * 8
                 theoretical_time = packet_size_bits / (self.bandwidth_mbps * 1_000_000)
@@ -215,27 +213,23 @@ class TCPNetworkConditions(NetworkConditions):
                 if expected_elapsed > elapsed:
                     await asyncio.sleep(expected_elapsed - elapsed)
             
-            # Apply packet loss
             if random.random() < self.packet_loss_rate:
                 self.tcp_queue.task_done()
                 continue
                 
-            # Apply packet corruption
             if random.random() < self.corruption_rate:
                 if isinstance(data, bytes) and len(data) > 0:
                     pos = random.randrange(len(data))
                     corrupt_byte = data[pos] ^ random.randint(1, 255)
                     data = data[:pos] + bytes([corrupt_byte]) + data[pos+1:]
             
-            # Calculate latency with jitter
-            latency = self.latency_ms / 1000  # Convert to seconds
+            latency = self.latency_ms / 1000 
             if self.jitter_ms > 0:
                 jitter = random.uniform(-self.jitter_ms/1000, self.jitter_ms/1000)
                 latency += jitter
                 
-            # Apply packet reordering
             if random.random() < self.reordering_rate:
-                reorder_delay = latency * 2  # Reordered packets arrive later
+                reorder_delay = latency * 2 
                 asyncio.create_task(self._delayed_delivery(reorder_delay, data, writer, None))
             else:
                 await self._delayed_delivery(latency, data, writer, None)

@@ -125,7 +125,7 @@ async def test_hybrid_basic_connectivity(hybrid_net, realistic_network):
     await adapter.start_server()
     
     hybrid_app = await hybrid_net.create_hybrid_application("test_app", dst_ipcp, adapter_name="test_adapter")
-    await hybrid_app.bind(5000)  # Bind to port 5000 in RINA network
+    await hybrid_app.bind(5000) 
     
     reader, writer = await asyncio.open_connection("127.0.0.1", 8001)
     
@@ -173,11 +173,10 @@ async def test_throughput_hybrid_network(hybrid_net, realistic_network):
             
             flow_id = await src_ipcp.allocate_flow(dst_ipcp, port=5000)
             adapter_name = f"adapter_{profile_name}_{packet_size}"
-            tcp_port = 8000 + hash(adapter_name) % 1000  # Generate a unique port
+            tcp_port = 8000 + hash(adapter_name) % 1000  
             adapter = await hybrid_net.create_tcp_adapter(adapter_name, port=tcp_port)
             await hybrid_net.connect_adapter_to_rina(adapter_name, src_ipcp_id, "test_dif")
             
-            # Apply network conditions to both RINA and TCP
             await realistic_network.set_network_conditions(src_ipcp_id, dst_ipcp_id, profile)
             await hybrid_net.set_tcp_adapter_network_conditions(adapter_name, profile)
             
@@ -209,13 +208,12 @@ async def test_throughput_hybrid_network(hybrid_net, realistic_network):
                         if response:
                             packets_received += 1
                     except asyncio.TimeoutError:
-                        pass  # Continue without waiting for response
+                        pass  
                     if profile["bandwidth_mbps"]:
-                        # Calculate theoretical time to send based on bandwidth
                         packet_time = (packet_size * 8) / (profile["bandwidth_mbps"] * 1_000_000)
-                        await asyncio.sleep(packet_time * 0.5)  # Sleep slightly less than theoretical time
+                        await asyncio.sleep(packet_time * 0.5)
                     else:
-                        await asyncio.sleep(0.001)  # Minimal sleep
+                        await asyncio.sleep(0.001) 
             except Exception as e:
                 logging.error(f"Error during throughput test: {str(e)}")
             finally:
@@ -274,7 +272,7 @@ async def test_latency_jitter_hybrid(hybrid_net, realistic_network):
             flow_id = await src_ipcp.allocate_flow(dst_ipcp, port=5000)
 
             adapter_name = f"adapter_{profile_name}_{packet_size}"
-            tcp_port = 8000 + hash(adapter_name) % 1000  # Generate a unique port
+            tcp_port = 8000 + hash(adapter_name) % 1000 
             adapter = await hybrid_net.create_tcp_adapter(adapter_name, port=tcp_port)
             await hybrid_net.connect_adapter_to_rina(adapter_name, src_ipcp_id, "test_dif")
             await hybrid_net.set_tcp_adapter_network_conditions(adapter_name, profile)
@@ -288,7 +286,7 @@ async def test_latency_jitter_hybrid(hybrid_net, realistic_network):
                 ("127.0.0.1", tcp_port),
                 packet_size=packet_size,
                 packet_count=current_samples,
-                inter_packet_delay=0.05  # Increased to reduce congestion
+                inter_packet_delay=0.05 
             )
             
             profile_results[packet_size] = {
@@ -309,7 +307,6 @@ async def test_latency_jitter_hybrid(hybrid_net, realistic_network):
         
         results[profile_name] = profile_results
     
-    # Store results in the global metrics dictionary
     metrics["latency_jitter_hybrid"] = results
     return results
 
@@ -318,20 +315,16 @@ async def test_packet_delivery_ratio_hybrid(hybrid_net, realistic_network):
     """Test PDR under different network profiles and loads in hybrid network"""
     results = {}
     
-    # Parameters
     packet_sizes = [64, 1024, 4096]
     packets_per_test = 500
     
-    # Create network components
     dif = await hybrid_net.create_rina_dif("test_dif", layer=0)
     
-    # Test different network profiles
     for profile_name, profile in network_conditions.NETWORK_PROFILES.items():
         print(f"\nTesting packet delivery ratio on {profile_name} hybrid network profile")
         profile_results = {}
         
         for packet_size in packet_sizes:
-            # Create fresh IPCPs for each test
             src_ipcp_id = f"src_ipcp_{profile_name}_{packet_size}"
             dst_ipcp_id = f"dst_ipcp_{profile_name}_{packet_size}"
             
@@ -346,30 +339,25 @@ async def test_packet_delivery_ratio_hybrid(hybrid_net, realistic_network):
 
             flow_id = await src_ipcp.allocate_flow(dst_ipcp, port=5000)
             
-            # Create TCP adapter
             adapter_name = f"adapter_{profile_name}_{packet_size}"
-            tcp_port = 8000 + hash(adapter_name) % 1000  # Generate a unique port
+            tcp_port = 8000 + hash(adapter_name) % 1000  
             adapter = await hybrid_net.create_tcp_adapter(adapter_name, port=tcp_port)
             await hybrid_net.connect_adapter_to_rina(adapter_name, src_ipcp_id, "test_dif")
             await hybrid_net.set_tcp_adapter_network_conditions(adapter_name, profile)
 
-            # Create applications
             app_dst = await hybrid_net.create_hybrid_application(f"app_dst_{profile_name}_{packet_size}", dst_ipcp)
             await app_dst.bind(5000)
             
-            # Start TCP adapter
             await adapter.start_server()
             
-            # Apply network conditions
             await realistic_network.set_network_conditions(src_ipcp_id, dst_ipcp_id, profile)
             
-            # Measure metrics
             test_metrics = await measure_hybrid_flow_metrics(
                 adapter,
                 ("127.0.0.1", tcp_port),
                 packet_size=packet_size,
                 packet_count=packets_per_test,
-                inter_packet_delay=0.02  # Give packets time to arrive
+                inter_packet_delay=0.02 
             )
             
             profile_results[packet_size] = {
@@ -384,7 +372,6 @@ async def test_packet_delivery_ratio_hybrid(hybrid_net, realistic_network):
         
         results[profile_name] = profile_results
     
-    # Store results in the global metrics dictionary
     metrics["packet_delivery_ratio_hybrid"] = results
     return results
 
@@ -393,10 +380,8 @@ async def test_concurrent_tcp_connections(hybrid_net, realistic_network):
     """Test scalability with concurrent TCP connections"""
     results = {}
     
-    # Parameters
     connection_counts = [1, 5, 10, 25]
     
-    # Create base network components
     dif = await hybrid_net.create_rina_dif("test_dif", layer=0)
     src_ipcp = await hybrid_net.create_rina_ipcp("src_ipcp", "test_dif")
     dst_ipcp = await hybrid_net.create_rina_ipcp("dst_ipcp", "test_dif")
@@ -409,14 +394,11 @@ async def test_concurrent_tcp_connections(hybrid_net, realistic_network):
 
     flow_id = await src_ipcp.allocate_flow(dst_ipcp, port=5000)
     
-    # Create TCP adapter
     adapter = await hybrid_net.create_tcp_adapter("test_adapter", port=8100)
     await hybrid_net.connect_adapter_to_rina("test_adapter", "src_ipcp", "test_dif")
-    # Create application
     app = await hybrid_net.create_hybrid_application("app_dst", dst_ipcp)
     await app.bind(5000)
     
-    # Start TCP adapter
     await adapter.start_server()
     
     for connection_count in connection_counts:
@@ -427,7 +409,6 @@ async def test_concurrent_tcp_connections(hybrid_net, realistic_network):
         success_count = 0
         data_success = 0
         
-        # Establish connections
         for i in range(connection_count):
             try:
                 reader, writer = await asyncio.open_connection("127.0.0.1", 8100)
@@ -438,21 +419,18 @@ async def test_concurrent_tcp_connections(hybrid_net, realistic_network):
         
         establishment_time = time.time() - start_time
         
-        # Send data through all connections
         test_data = b"test_data"
         for i, (reader, writer) in enumerate(connections):
             try:
                 writer.write(test_data)
                 await writer.drain()
                 
-                # Wait for response
                 response = await asyncio.wait_for(reader.read(len(test_data)), timeout=2.0)
                 if response == test_data:
                     data_success += 1
             except Exception as e:
                 logging.error(f"Error sending/receiving data through connection {i+1}: {str(e)}")
         
-        # Close all connections
         for reader, writer in connections:
             writer.close()
             await writer.wait_closed()
@@ -469,7 +447,6 @@ async def test_concurrent_tcp_connections(hybrid_net, realistic_network):
               f"({results[connection_count]['establishment_time_per_conn_ms']:.2f}ms per connection)")
         print(f"Data exchange success rate: {results[connection_count]['data_exchange_success_rate']:.2f}%")
     
-    # Store results in global metrics
     metrics["concurrent_tcp_connections"] = results
     return results
 
