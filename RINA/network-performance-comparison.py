@@ -530,7 +530,182 @@ def plot_concurrent_comparison(df):
             plt.tight_layout()
             plt.savefig('charts/rina_bandwidth_allocation.png', dpi=300)
 
-# 5. Summary comparison
+# Add this function to your existing Python script
+def extract_rtt_data():
+    networks = ['perfect', 'lan', 'wifi', 'congested']
+    packet_sizes = [64, 512, 1024, 4096]
+    
+    all_data = []
+    
+    # Extract RINA RTT data
+    for network in networks:
+        for size in packet_sizes:
+            if str(size) in rina_data['round_trip_time_realistic'][network]:
+                row = {
+                    'Protocol': 'RINA',
+                    'Network': network,
+                    'Packet_Size': size,
+                    'Avg_RTT_ms': rina_data['round_trip_time_realistic'][network][str(size)]['avg_rtt_ms'],
+                    'Min_RTT_ms': rina_data['round_trip_time_realistic'][network][str(size)]['min_rtt_ms'],
+                    'Max_RTT_ms': rina_data['round_trip_time_realistic'][network][str(size)]['max_rtt_ms']
+                }
+                all_data.append(row)
+    
+    # Extract RTT data from TCP latency_jitter data since it contains RTT
+    for network in networks:
+        for size in packet_sizes:
+            if str(size) in tcp_data['latency_jitter_tcp'][network]:
+                row = {
+                    'Protocol': 'TCP',
+                    'Network': network,
+                    'Packet_Size': size,
+                    'Avg_RTT_ms': tcp_data['latency_jitter_tcp'][network][str(size)]['avg_rtt_ms'],
+                    'Min_RTT_ms': tcp_data['latency_jitter_tcp'][network][str(size)]['min_latency_ms'] * 2,  # Approximating min RTT
+                    'Max_RTT_ms': tcp_data['latency_jitter_tcp'][network][str(size)]['max_latency_ms'] * 2   # Approximating max RTT
+                }
+                all_data.append(row)
+    
+    # Extract RTT data from Hybrid latency_jitter data
+    for network in networks:
+        for size in packet_sizes:
+            if str(size) in hybrid_data['latency_jitter_hybrid'][network]:
+                row = {
+                    'Protocol': 'Hybrid',
+                    'Network': network,
+                    'Packet_Size': size,
+                    'Avg_RTT_ms': hybrid_data['latency_jitter_hybrid'][network][str(size)]['avg_rtt_ms'],
+                    'Min_RTT_ms': hybrid_data['latency_jitter_hybrid'][network][str(size)]['min_latency_ms'] * 2,  # Approximating min RTT
+                    'Max_RTT_ms': hybrid_data['latency_jitter_hybrid'][network][str(size)]['max_latency_ms'] * 2   # Approximating max RTT
+                }
+                all_data.append(row)
+    
+    # Create dataframe
+    df = pd.DataFrame(all_data)
+    
+    # Save to CSV
+    df.to_csv('csv_output/rtt_comparison.csv', index=False)
+    
+    return df
+
+def plot_rtt_comparison(df):
+    # 1. Create bar plots for Average RTT comparison
+    plt.figure(figsize=(16, 10))
+    g = sns.FacetGrid(df, col='Network', row='Packet_Size', height=3, aspect=1.5)
+    g.map_dataframe(sns.barplot, x='Protocol', y='Avg_RTT_ms', errorbar=None, palette='viridis')
+    
+    g.set_axis_labels('Protocol', 'Average RTT (ms)')
+    g.set_titles(col_template='{col_name} Network', row_template='Packet Size: {row_name} bytes')
+    
+    # Improve readability
+    for ax in g.axes.flat:
+        ax.grid(True, linestyle='--', alpha=0.6)
+    
+    plt.tight_layout()
+    plt.savefig('charts/rtt_comparison_bar.png', dpi=300)
+    plt.close()
+    
+    # 2. Create error bar plots to show RTT ranges (min, avg, max)
+    plt.figure(figsize=(18, 12))
+    
+    # Set up plot grid
+    networks = df['Network'].unique()
+    protocols = df['Protocol'].unique()
+    
+    fig, axes = plt.subplots(len(networks), 1, figsize=(12, 4*len(networks)))
+    
+    for i, network in enumerate(networks):
+        ax = axes[i] if len(networks) > 1 else axes
+        network_data = df[df['Network'] == network]
+        
+        for j, protocol in enumerate(protocols):
+            protocol_data = network_data[network_data['Protocol'] == protocol]
+            
+            if not protocol_data.empty:
+                # Group by packet size
+                for packet_size in protocol_data['Packet_Size'].unique():
+                    size_data = protocol_data[protocol_data['Packet_Size'] == packet_size]
+                    
+                    if not size_data.empty:
+                        x_pos = j + (protocols.tolist().index(protocol) * 0.3) * (len(protocol_data['Packet_Size'].unique()) / 4)
+                        
+                        # Plot error bars for min, avg, max RTT
+                        ax.errorbar(
+                            x=x_pos + 0.1 * protocols.tolist().index(protocol),
+                            y=size_data['Avg_RTT_ms'].values[0],
+                            yerr=[[size_data['Avg_RTT_ms'].values[0] - size_data['Min_RTT_ms'].values[0]],
+                                  [size_data['Max_RTT_ms'].values[0] - size_data['Avg_RTT_ms'].values[0]]],
+                            fmt='o',
+                            capsize=5,
+                            label=f"{protocol} - {packet_size} bytes"
+                        )
+        
+        ax.set_title(f'RTT Range for {network.capitalize()} Network')
+        ax.set_ylabel('RTT (ms)')
+        ax.set_xlabel('Protocol and Packet Size')
+        ax.grid(True, linestyle='--', alpha=0.6)
+        
+        # Set x-ticks
+        ax.set_xticks(range(len(protocols)))
+        ax.set_xticklabels(protocols)
+    
+    plt.tight_layout()
+    plt.savefig('charts/rtt_range_comparison.png', dpi=300)
+    plt.close()
+    
+    # 3. Create a heatmap of RTT values
+    pivot_df = df.pivot_table(
+        index=['Protocol', 'Packet_Size'],
+        columns='Network',
+        values='Avg_RTT_ms'
+    )
+    
+    plt.figure(figsize=(12, 10))
+    sns.heatmap(pivot_df, annot=True, cmap='YlGnBu', fmt='.2f', linewidths=.5)
+    plt.title('Average RTT (ms) Across Networks, Protocols and Packet Sizes')
+    plt.tight_layout()
+    plt.savefig('charts/rtt_heatmap.png', dpi=300)
+    plt.close()
+    
+    # 4. Create line plots to show trends of RTT across packet sizes
+    plt.figure(figsize=(14, 8))
+    for network in df['Network'].unique():
+        network_data = df[df['Network'] == network]
+        plt.figure(figsize=(10, 6))
+        
+        for protocol in network_data['Protocol'].unique():
+            protocol_data = network_data[network_data['Protocol'] == protocol]
+            protocol_data = protocol_data.sort_values('Packet_Size')
+            plt.plot(protocol_data['Packet_Size'], protocol_data['Avg_RTT_ms'], 
+                    marker='o', linewidth=2, label=protocol)
+        
+        plt.title(f'RTT Trends by Packet Size - {network.capitalize()} Network')
+        plt.xlabel('Packet Size (bytes)')
+        plt.ylabel('Average RTT (ms)')
+        plt.grid(True, linestyle='--', alpha=0.6)
+        plt.legend()
+        plt.tight_layout()
+        plt.savefig(f'charts/rtt_trends_{network}.png', dpi=300)
+        plt.close()
+    
+    # 5. Create box plots to compare RTT distribution across protocols
+    plt.figure(figsize=(14, 10))
+    g = sns.FacetGrid(df, col='Network', height=6, aspect=1.2)
+    g.map_dataframe(sns.boxplot, x='Protocol', y='Avg_RTT_ms', hue='Packet_Size', palette='Set3')
+    
+    g.set_axis_labels('Protocol', 'Average RTT (ms)')
+    g.set_titles(col_template='{col_name} Network')
+    g.add_legend(title='Packet Size (bytes)')
+    
+    # Improve readability
+    for ax in g.axes.flat:
+        ax.grid(True, linestyle='--', alpha=0.6)
+    
+    plt.tight_layout()
+    plt.savefig('charts/rtt_boxplot.png', dpi=300)
+    plt.close()
+    
+    print("RTT visualization charts created successfully!")
+
 def create_summary_comparison():
     # Create a summary table comparing key metrics
     throughput_df = pd.read_csv('csv_output/throughput_comparison.csv')
@@ -565,12 +740,13 @@ throughput_df = extract_throughput_data()
 latency_df = extract_latency_data()
 pdr_df = extract_pdr_data()
 concurrent_df = extract_concurrent_data()
+rtt_df = extract_rtt_data()
 
-# Generate visualizations
 plot_throughput_comparison(throughput_df)
 plot_latency_comparison(latency_df)
 plot_jitter_comparison(latency_df)
 plot_pdr_comparison(pdr_df)
+plot_rtt_comparison(rtt_df)
 plot_concurrent_comparison(concurrent_df)
 
 # Create summary
